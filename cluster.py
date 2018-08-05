@@ -10,396 +10,14 @@ Various scikit-learn compatible clustering algorithms.
 __author__ = 'Severin E. R. Langberg'
 __email__ = 'Langberg91@gmail.no'
 
-
-import sys
-import logging
-import rpy2.robjects.numpy2ri
+import os
 
 import numpy as np
 import rpy2.robjects as robjects
 
-from io import StringIO
-from rpy2.rinterface import RRuntimeError
-
-
-rpy2.robjects.numpy2ri.activate()
-
-import warnings
-from rpy2.rinterface import RRuntimeWarning
-
-verbose = False
-if not verbose:
-    warnings.filterwarnings('ignore', category=RRuntimeWarning)
-
-
-"""Utility functions for dealing with R"""
-#from rpy2 import interactive as r
-#import rpy2.robjects as robjects
-
-#try:
-#    from rpy2.robjects.packages import importr
-#except ImportError:
-#    from rpy2.interactive import importr
-#base = importr('base')
-#def get_bioclite():
-#    """
-#    Note: requires an internet connection.
-#
-#    """
-#    base.source("http://bioconductor.org/biocLite.R")
-#    return robjects.r['biocLite']
-
-
-class Biclusters(list):
-    """A list of biclusters with extra attributes.
-
-    model (): The ,pdeø algorithm that generated these biclusters
-    args (): The model arguments.
-    props (): The model properties.
-
-    """
-    def __init__(self, output, model=None, args=None, props=None):
-
-        list.__init__(self, output)
-
-        self.algorithm = model
-        self.arguments = args
-        self.properties = props
-
-
-class Bicluster:
-    """A bicluster representation.
-
-    Args:
-        rows: (list of ints): The bicluster row indices.
-        cols: (list of ints): The bicluster column indices.
-        data (numpy.ndarray): The dataset of which the bicluster originates.
-
-    Returns:
-        ():
-
-    """
-
-    def __init__(self, rows, cols, data=None):
-
-        self.rows = rows
-        self.cols = cols
-        self.data = data
-
-    @property
-    def rows(self):
-
-        return self._rows
-
-    @rows.setter
-    def rows(self, value):
-
-        self._rows = value
-
-    def __eq__(self, other):
-        """Test two biclusters for equality.
-
-        Two biclusters are equal if the have the same rows and
-        columns, and they have the same object as their data
-        member. It is not enough that their data be equal; it must be
-        the same object.
-
-        Args:
-            other: A bicluster to compare.
-
-        """
-
-        # Compare bicluster elements.
-        rows_equal = set(self.rows) == set(other.rows)
-        cols_equal = set(self.cols) == set(other.cols)
-        data_equal = id(self.data) == id(other.data)
-
-        return rows_equal and cols_equal and data_equal
-
-    def copy(self):
-        """Returns a deep copy of the bicluster."""
-
-        rows_cp, cols_cp = copy.copy(self.rows), copy.copy(self.cols)
-        other = Bicluster(rows_cp, cols_cp, self.data)
-
-        return other
-
-    def array(self, rows=None, cols=None):
-        """Get a numpy array bicluster from data, using the indices in
-        bic_indices.
-
-        Note: requires that this Bicluster's data member is not None.
-
-        Args:
-            rows: the row indices to use; defaults to this bicluster's rows.
-            cols: the column indices; defaults to this bicuster's columns.
-
-        """
-
-        if self.data is None:
-            array = None
-        else:
-            rows = self.rows if rows is None else rows
-            cols = self.cols if cols is None else cols
-            array = self.data.take(rows, axis=0).take(list(cols), axis=1)
-
-        return array
-
-    def filter_rows(self):
-        """Returns the dataset with only the rows from this bicluster."""
-
-        # NOTE: requires that this Bicluster's data member is not None.
-        return self.array(cols=np.arange(self.data.shape[1]))
-
-    def filter_cols(self):
-        """Returns the dataset with only the columns from this bicluster."""
-
-        # NOTE: requires that this Bicluster's data member is not None.
-        return self.array(rows=np.arange(self.data.shape[0]))
-
-    def intersection(self, other):
-        """Determines the intersecting rows and columns of two biclusters.
-
-        Args:
-            other: a Bicluster
-
-        Returns:
-            (Bicluster): A Bicluster instance, with rows and columns common to
-                both self and other.
-
-            If other and self have the same data attribute, the
-            returned Bicluster also has it; else its data attribute is
-            None.
-
-        """
-
-        rows = set(self.rows).intersection(set(other.rows))
-        cols = set(self.cols).intersection(set(other.cols))
-
-        return Bicluster(rows, cols, _get_data_(self.data, other.data))
-
-    def union(self, other):
-        """Determines the union rows and columns of two biclusters.
-
-        Args:
-            other: a Bicluster
-
-        Returns:
-            A Bicluster instance with all rows and columns from both self
-            and other.
-
-            If other and self have the same data attribute, the
-            returned Bicluster also has it; else its data attribute is
-            None.
-
-        """
-
-        rows = set(self.rows).union(set(other.rows))
-        cols = set(self.cols).union(set(other.cols))
-
-        return Bicluster(rows, cols, _get_data_(self.data, other.data))
-
-    def symmetric_difference(self, other):
-        """Returns a new bicluster with only unique rows and columns,
-        i.e. the inverse of the intersection.
-
-        Args:
-            other: a Bicluster
-
-        Returns:
-            A Bicluster instance with all rows and columns unique to either self
-            or other.
-
-            If other and self have the same data attribute, the
-            returned Bicluster also has it; else its data attribute is
-            None.
-
-        """
-
-        rows = set(self.rows).symmetric_difference(set(other.rows))
-        cols = set(self.cols).symmetric_difference(set(other.cols))
-
-        return Bicluster(rows, cols, _get_data_(self.data, other.data))
-
-    def difference(self, other):
-        """
-        Returns the difference of two biclusters.
-
-        Args:
-            * other: a Bicluster
-
-        Returns:
-            A Bicluster instance with self's rows and columns, but not other's.
-
-            If other and self have the same data attribute, the
-            returned Bicluster also has it; else its data attribute is
-            None.
-
-
-        """
-
-        rows = set(self.rows).difference(set(other.rows))
-        cols = set(self.cols).difference(set(other.cols))
-
-        return Bicluster(rows, cols)
-
-    def issubset(self, other):
-        """
-        Returns True if self's rows and columns are both subsets of
-        other's; else False.
-
-        """
-
-        return (set(self.rows).issubset(set(other.rows)) and
-                set(self.cols).issubset(set(other.cols)))
-
-    def shape(self):
-        """Returns the number of rows and columns in this bicluster."""
-        return len(self.rows), len(self.cols)
-
-    def area(self):
-        """Returns the number of elements in this bicluster."""
-        return len(self.rows) * len(self.cols)
-
-    def overlap(self, other):
-        """Returns the ratio of the overlap area to self's total size."""
-        return self.intersection(other).area() / self.area()
-
-    def __repr__(self):
-        return "Bicluster({0}, {1})".format(repr(self.rows), repr(self.cols))
-
-
-class RBiclusterBase:
-
-    GLOBAL_METHOD = 'biclust'
-
-    def __init__(self):
-
-        # NOTE:
-        self._output = None
-
-        self.rows_ = None
-        self.columns_ = None
-        self.biclusters_ = None
-
-        self.row_labels = None
-        self.column_labels = None
-
-    @property
-    def rows_(self):
-
-        return self._rows
-
-    @rows_.setter
-    def rows_(self, value):
-
-        if value is None:
-            return
-        else:
-            self._rows = value
-            #if isinstance(value, (list, np.ndarray, tuple)):
-            #    self._rows = np.array(value)
-            #else:
-            #    raise ValueError('Bicluster rows should be <numpy.ndarray>, '
-            #                     'not {}'.format(type(value)))
-
-    @property
-    def columns_(self):
-
-        return self._columns
-
-    @columns_.setter
-    def columns_(self, value):
-
-        if value is None:
-            return
-        else:
-            print(type(value))
-            self._columns = value
-            #if isinstance(value, (list, np.ndarray, tuple)):
-            #    self._columns = np.array(value)
-            #else:
-            #    raise ValueError('Bicluster columns should be <numpy.ndarray>, '
-            #                     'not {}'.format(type(value)))
-
-    @property
-    def biclusters_(self):
-
-        return self._biclusters
-
-    @biclusters_.setter
-    def biclusters_(self, value):
-
-        if value is None:
-            return
-        else:
-            if isinstance(value, (tuple, list)):
-                self._biclusters = value
-            else:
-                raise ValueError('Biclusters should be <tuple>, not {}'
-                                 ''.format(type(value)))
-
-
-    def execute_r_function(self, method, data, params):
-        """Executes the R function with given data and parameters."""
-
-        # Run biclustering algorithm.
-        robjects.r.library(self.GLOBAL_METHOD)
-        function = robjects.r[self.GLOBAL_METHOD]
-        #function = robjects.r[method]
-
-        # Output is rpy2.robjects.methods.RS4 object
-        try:
-            self._output = function(data, method=method, **params)
-        except:
-            raise RuntimeError('Error in R with {}'.format(method))
-
-    def fetch_biclusters(self, X):
-        # Set rows and columns attributes.
-
-        # Collect logical R matrices of biclusters rows and columns.
-        _row_mat = np.array(self._output.do_slot('RowxNumber'), dtype=bool)
-        _col_mat = np.array(self._output.do_slot('NumberxCol'), dtype=bool)
-
-        row_mat, col_mat = self._check_cluster_coords(_row_mat, _col_mat)
-
-        self.rows_, self.columns_ = row_mat.T, col_mat
-        self.biclusters_ = (self.rows_, self.columns_)
-
-        """
-        # Collect biclusters
-        rows, cols = [], []
-        for col_num in range(row_mat.shape[1]):
-
-            row_bools, col_bools = row_mat[:, num] != 0, col_mat[num, :] != 0
-            # Value: True/False
-
-            _rows = [num for num, value in enumerate(row_bools) if value]
-            _cols = [num for num, value in enumerate(col_bools) if value]
-            rows.append(np.array(_rows, dtype=bool))
-            cols.append(np.array(_cols, dtype=bool))
-
-        self.rows_, self.columns_ = rows, cols
-        self.biclusters_ = (self.rows_, self.columns_)
-
-        return self"""
-
-    @staticmethod
-    def _check_cluster_coords(row_mat, col_mat):
-        # NOTE: Cheng and Church can sometimes return column matrix transpose.
-
-        num_clusters = row_mat.shape[1]
-        if num_clusters == col_mat.shape[0]:
-            return row_mat, col_mat
-
-        else:
-
-            rows_cols = (row_mat.shape[0], col_mat.shape[0])
-            if num_clusters == col_mat.shape[1] and rows_cols == data.shape:
-                return row_mat, col_matrix.T
-            else:
-                raise RuntimeError('Invalid formatted array returned from {}'
-                                   ''.format(model_name))
+from base import RBiclusterBase
+from sklearn.cluster.bicluster import SpectralBiclustering
+from sklearn.cluster.bicluster import SpectralCoclustering
 
 
 class ChengChurch(RBiclusterBase):
@@ -432,12 +50,16 @@ class ChengChurch(RBiclusterBase):
         # Run R biclustering algorithm.
         self.execute_r_function(self.method, X, self.params)
 
+        return self
+
     def transform(self, X, y=None, **kwargs):
 
         # TODO: Check is fitted
 
         # Format R biclustering algorithm output to numpy.narray.
         self.fetch_biclusters(X)
+
+        return self.biclusters_
 
     def fit_transform(self, X, y=None, **kwargs):
 
@@ -488,6 +110,8 @@ class Plaid(RBiclusterBase):
         # Run R biclustering algorithm.
         self.execute_r_function(self.method, X, self.params)
 
+        return self
+
     def transform(self, X, y=None, **kwargs):
 
         # TODO: Check is fitted
@@ -495,40 +119,7 @@ class Plaid(RBiclusterBase):
         # Format R biclustering algorithm output to numpy.narray.
         self.fetch_biclusters(X)
 
-    def fit_transform(self, X, y=None, **kwargs):
-
-        self.fit(X, y=y, **kwargs)
-
-        return self.transform(X, y=y, **kwargs)
-
-
-class Spectral(RBiclusterBase):
-
-    params = {
-        'normalization': 'log',
-        'numberOfEigenvalues': 3,
-        'minr': 2,
-        'minc': 2,
-        'withinVar': 1
-    }
-
-    def __init__(self, method='BCSpectral', **kwargs):
-
-        super().__init__()
-
-        self.method = method
-
-        # TODO: Iterate through kwargs, if any kwargs has key same as params,
-        # update value. Necessary for sklearn Grid Search
-
-    def fit(self, X, y=None, **kwargs):
-
-        # Run R biclustering algorithm.
-        self.execute_r_function(self.method, X, self.params)
-
-    def transform(self, X, y=None, **kwargs):
-
-        self.format_biclusters()
+        return self.biclusters_
 
     def fit_transform(self, X, y=None, **kwargs):
 
@@ -573,22 +164,57 @@ class XMotifs(RBiclusterBase):
         # Run R biclustering algorithm.
         self.execute_r_function(self.method, X_discrete, self.params)
 
+        return self
+
     def transform(self, X, y=None, **kwargs):
-        # QUESTION: Return biclusters objects?
 
         # TODO: Check is fitted
 
         # Format R biclustering algorithm output to numpy.narray.
-        #self.format_biclusters()
+        self.fetch_biclusters(X)
 
-        #return self.biclusters
-        pass
+        return self.biclusters_
 
     def fit_transform(self, X, y=None, **kwargs):
 
         self.fit(X, y=y, **kwargs)
 
         return self.transform(X, y=y, **kwargs)
+
+
+class Spectral:
+    """A scikit-learn wrapper for spectral biclustering algorithms.
+
+    """
+
+    def __init__(self, model='bi', **kwargs):
+
+        if model == 'bi':
+            self.model = SpectralBiclustering(**kwargs)
+        elif model == 'co':
+            self.model = SpectralCoclustering(**kwargs)
+        else:
+            raise ValueError('Invalid model: `{}` not among [`bi`, `co`]'
+                             ''.format(model))
+
+    def fit(self, X, y=None, **kwargs):
+
+        self.model.fit(X, y=y, **kwargs)
+
+        return self
+
+    def transform(self, X, y=None, **kwargs):
+
+        return self.model.biclusters_
+
+    def fit_transform(self, X, y=None, **kwargs):
+
+        self.fit(X, y=y, **kwargs)
+
+        return self.transform(X, y=y, **kwargs)
+
+
+
 
 
 """Binary utility functions"""
@@ -607,32 +233,6 @@ class PathError(Exception):
         super().__init__(message)
 
 
-# TODO: Replace with check_binary which raises error instead of returning None?
-def path_to_program(program, path_var='PATH'):
-    """Check if an executable is included in $PATH environment variable."""
-
-    def is_exec(fpath):
-
-        return os.path.exists(fpath) and os.access(fpath, os.X_OK)
-
-    fpath, fname = os.path.split(program)
-    if fpath:
-        if is_exec(program):
-            return program
-        #else:
-        #    return None
-    else:
-        for path in os.environ[path_var].split(os.pathsep):
-
-            exe_file = os.path.join(path, program)
-            if is_exec(exe_file):
-                return exe_file
-            #else:
-            #    return None
-
-    return None
-
-
 class BinaryBiclusteringBase:
     """
 
@@ -642,12 +242,11 @@ class BinaryBiclusteringBase:
 
     """
 
-    INPUT_FILE = 'data'
-    OUTPUT_FILE = 'results'
+    INPUT_FILE = 'input'
 
-    def __init__(self, binary=None, file_format='txt', temp=False):
+    def __init__(self, model, file_format='txt', temp=False):
 
-        self.binary = binary
+        self.model = model#self.check_on_path(model)
         self.file_format = file_format
         self.temp = temp
 
@@ -655,18 +254,30 @@ class BinaryBiclusteringBase:
         self.path_dir = None
         self.path_data = None
 
-    @property
-    def binary(self):
+    # ERROR: Something mysterious goingin on
+    @staticmethod
+    def check_on_path(model, path_var='PATH'):
+        """Check if an executable is included in $PATH environment variable."""
 
-        return self._binary
+        def _is_exec(fpath):
+            #
 
-    @binary.setter
-    def binary(self, value):
+            return os.path.exists(fpath) and os.access(fpath, os.X_OK)
 
-        if path_to_program(value) is None:
-            raise PathError('Executable {0} not on $PATH'.format(value))
+        def _path_error(model):
+            # Raises path error if executable not found on path.
+
+            raise PathError('Executable {0} not on $PATH'.format(model))
+
+        fpath, fname = os.path.split(model)
+        if fpath:
+            if _is_exec(model):
+                return model
         else:
-            self._binary = value
+            for path in os.environ[path_var].split(os.pathsep):
+                exe_file = os.path.join(path, model)
+                if _is_exec(exe_file):
+                    return model
 
     @property
     def path_dir(self):
@@ -695,14 +306,16 @@ class BinaryBiclusteringBase:
                 raise ValueError('file path should be <str>, not {}'
                                  ''.format(type(value)))
 
-    def io_setup(self):
-        # Set paths to temp dir holding the input and output data.
+    def setup_io(self):
+        """Create dir holding formatted input data and raw output data."""
 
         if self.temp:
             self.path_dir = tempfile.mkdtemp()
         else:
-            self.path_dir = '{0}_{1}'.format(self.binary, self.OUTPUT_FILE)
+            current_loc = os.getcwd()
+            dir_name = '{0}_data'.format(self.model)
 
+            self.path_dir = os.path.join(current_loc, dir_name)
             if not os.path.exists(self.path_dir):
                 os.makedirs(self.path_dir)
 
@@ -710,7 +323,7 @@ class BinaryBiclusteringBase:
             self.path_dir, '{0}.{1}'.format(self.INPUT_FILE, self.file_format)
         )
 
-    def io_teardown(self):
+    def io_teardown_temp(self):
 
         # Cleanup temporary directory
         shutil.rmtree(self.path_dir)
@@ -722,18 +335,17 @@ class CPB(BinaryBiclusteringBase):
     Detects biclusters based on row correlations.
 
     Attribtues:
-        biclusters (list):
+        rows_ ():
+        columns_ ():
+        biclusters_ ():
 
     """
 
-    # Name
-    MODEL = 'cpb'
-
-    # File format of binary output data
-    FILE_FORMAT = 'txt'
-
     # Initial bicluster
     INIT_BINARY = 'init_bicluster'
+
+    # Stem of output files holding the biclustering results.
+    STEM_OUTPUT_FILE = '.out'
 
     # Hyperparameters
     params = {
@@ -748,57 +360,41 @@ class CPB(BinaryBiclusteringBase):
         'fixw': 0
     }
 
-    def __init__(self, temp=False, **kwargs):
+    def __init__(self, model='cpb', file_format='txt', temp=False, **kwargs):
 
-        super().__init__(self.MODEL, self.FILE_FORMAT, temp)
+        super().__init__(model, file_format, temp)
 
         # TODO: Iterate through kwargs and update self.params
 
-    @property
-    def biclusters(self):
-
-        return self._biclusters
-
-    @biclusters.setter
-    def biclusters(self, value):
-
-        if value is None:
-            return
-        else:
-            if isinstance(value, list):
-                self._biclusters = value
-            else:
-                raise ValueError('biclusters should be <list>, not {}'
-                                 ''.format(type(value)))
-
     def fit(self, X, y=None, **kwargs):
-        """"""
 
         #_X = check_array(X)
 
+        # Call to base method to set paths for temp dir and data.
+        self.setup_io()
+        # Creates file of input data according to algorithm requirements.
         self.format_input(X)
+        # Call to application
         self.exec_clustering()
 
     def transform(self, X, y=None, **kwargs):
 
-        self.biclusters = self.collect_output(X)
+        # TODO: Check is fitted
+
+        self.fetch_biclusters(X)
 
         if self.temp:
-            self.io_teardown()
+            self.io_teardown_temp()
 
-        return self.biclusters
+        return self.biclusters_
 
     def fit_transform(self, X, y=None, **kwargs):
 
-        self.fit(X)
+        self.fit(X, y=y, **kwargs)
 
-        return self.transform(X)
+        return self.transform(X, y=y, **kwargs)
 
-    # NOTE: Replace wit hmy own `pandas` method? Produces same result?
     def format_input(self, X):
-
-        # NOTE: Base method to set paths for temp dir and data.
-        self.io_setup()
 
         self.params['nrows'], self.params['ncols'] = np.shape(X)
         with open(self.path_data, 'w') as outfile:
@@ -806,7 +402,7 @@ class CPB(BinaryBiclusteringBase):
             outfile.write(
                 '{0} {1}'.format(self.params['nrows'], self.params['ncols'])
             )
-            for row in data:
+            for row in X:
                 outfile.write('\n')
                 # TODO: Convert map row data to str instead of list comp?
                 outfile.write(' '.join([str(value) for value in row]))
@@ -817,34 +413,35 @@ class CPB(BinaryBiclusteringBase):
 
     def exec_clustering(self):
 
-        # Create file holding results
-        self._setup_exec()
+        # Create file holding results.
+        self._results_file()
 
-        # Change to current working dir
+        # Change to current working dir.
         current_loc = os.getcwd()
 
-        _path_data = os.path.abspath(self.path_data)
         try:
             os.chdir(self.path_dir)
             command = (
                 '{model} {outfile} {initfile} 1 {targetpcc} {fixw}'.format(
-                    model=self.MODEL, outfile=_path_data, **self.params
+                    model=self.model,
+                    outfile=os.path.abspath(self.path_data),
+                    **self.params
                 )
             )
             subprocess.check_call(command.split())
 
         except OSError:
-            raise PathError('Executable {0} not on $PATH'.format(value))
+            raise PathError('CPB not on $PATH')
 
         finally:
             os.chdir(current_loc)
 
-    def _setup_exec(self):
+    def _results_file(self):
 
         _path_dir = os.path.abspath(self.path_dir)
         parent, _ = os.path.split(_path_dir)
         self.params['initfile'] = os.path.join(
-            parent, 'initfile.{0}'.format(self.FILE_FORMAT)
+            parent, 'initfile.{0}'.format(self.file_format)
         )
         self.params['init_binary'] = self.INIT_BINARY
 
@@ -863,29 +460,48 @@ class CPB(BinaryBiclusteringBase):
 
         return self
 
-    def collect_output(self, X):
+    def fetch_biclusters(self, X):
 
         results_dir = os.path.abspath(self.path_dir)
         dir_files = os.listdir(results_dir)
 
-        biclusters = []
+        num_biclusters = 0
+        rows, cols = [], []
         for _file in dir_files:
 
             _, stem = os.path.splitext(_file)
-            if stem == '.out':
+            if stem == self.STEM_OUTPUT_FILE:
 
                 output_file = os.path.join(results_dir, _file)
-                biclusters.append(self.format_output(output_file, X))
+                row_idx, col_idx = self.read_output_file(output_file, X)
+                rows.append(row_idx), cols.append(col_idx)
 
-        return biclusters
+                num_biclusters += 1
 
-    def format_output(self, outfile, X):
-        """Reads the bicluster in a single CPB output file."""
+        # Create arrays of False.
+        row_clusters = np.zeros((num_biclusters, X.shape[0]), dtype=bool)
+        col_clusters = np.zeros((num_biclusters, X.shape[1]), dtype=bool)
+
+        for num in range(num_biclusters):
+            row_clusters[num, :][rows[num]] = True
+            col_clusters[num, :][cols[num]] = True
+
+        self.rows_, self.columns_ = row_clusters, col_clusters
+        self.biclusters_ = (self.rows_, self.columns_)
+
+    def read_output_file(self, filename, X):
+        """Reads the bicluster in a single CPB output file.
+
+        Returns:
+            (tuple): The bicluster row and column indices.
+
+        """
+
         rows, cols = [], []
-        with open(outfile, 'r') as resfile:
+        with open(filename, 'r') as outfile:
 
             target = rows
-            for line in resfile:
+            for line in outfile:
                 if line[0] == 'R':
                     continue
                 elif line[0] == 'C':
@@ -893,10 +509,9 @@ class CPB(BinaryBiclusteringBase):
                     continue
                 else:
                     target.append(int(line.split()[0]))
-
             rows.sort(), cols.sort()
 
-        return Bicluster(rows, cols, data=X)
+        return rows, cols
 
 
 class CCS(BinaryBiclusteringBase):
@@ -911,11 +526,8 @@ class CCS(BinaryBiclusteringBase):
 
     """
 
-    # Name
-    MODEL = 'ccs'
-
-    # File format of binary output data
-    FILE_FORMAT = 'txt'
+    # Name of the file containing the algorithm output.
+    OUTPUT_FILE = 'output'
 
     # The standard dimensions of the input file
     FILE_DIMS = 'Genes/Conditions'
@@ -927,74 +539,41 @@ class CCS(BinaryBiclusteringBase):
         'out_format': 0
     }
 
-    """Parameters:
+    def __init__(self, model='ccs', file_format='txt', temp=False, **kwargs):
 
-    -m [1 - number of gene/rows in the data matrix]: Set the number of base gene that are to be considered for forming biclusters.
-        Default value is 1000 or maximum number of genes when that is less than 1000.
+        super().__init__(model, file_format, temp)
 
-    -g [0.0 - 100.0]: Minimum gene set overlap required for merging the overlapped biclusters.
-        Default value is 100.0 for 100% overlap.
-
-    -p [0/1]: Set the output format. Default is 0. 0 - Print output in 3 rows.
-
-    Call syntax
-
-        input_file = ./Results/Synthetic_data_results/Data/Data_Constant_100_1_bicluster.txt
-        output_file = ./Results/Output_standard.txt
-
-        ccs -t 0.9 -i input_file -o output_file -m 50 -p 1 -g 100.0
-
-        bases, overlap, output
-
-    """
-
-    def __init__(self, temp=False):
-
-        super().__init__(self.MODEL, self.FILE_FORMAT, temp)
-
-    @property
-    def biclusters(self):
-
-        return self._biclusters
-
-    @biclusters.setter
-    def biclusters(self, value):
-
-        if value is None:
-            return
-        else:
-            if isinstance(value, list):
-                self._biclusters = value
-            else:
-                raise ValueError('biclusters should be <list>, not {}'
-                                 ''.format(type(value)))
+        # TODO: Iterate through kwargs and update self.params
 
     def fit(self, X, y=None, sep='\t', **kwargs):
 
-        # TODO: Check if cuda is available in setup
+        #_X = check_array(X)
 
-        self.format_input(X, sep=sep, **kwargs)
+        # Call to base method to set paths for temp dir and data.
+        self.setup_io()
+        # Creates file of input data according to algorithm requirements.
+        self.format_input(X, sep=sep)
+        # Call to application
         self.exec_clustering()
 
     def transform(self, X, y=None, **kwargs):
 
-        self.biclusters = self.collect_output(X)
+        # TODO: Check is fitted
+
+        self.fetch_biclusters(X)
 
         #if self.temp:
-        #    self.io_teardown()
+        #    self.io_teardown_temp()
 
-        #return self.biclusters
+        #return self.biclusters_
 
     def fit_transform(self, X, y=None, **kwargs):
 
-        self.fit(X)
+        self.fit(X, y=y, **kwargs)
 
-        return self.transform(X)
+        return self.transform(X, y=y, **kwargs)
 
     def format_input(self, X, sep='\t', **kwargs):
-
-        # NOTE: Base method to set paths for temp dir and data.
-        self.io_setup()
 
         try:
             rows = kwargs['']
@@ -1034,7 +613,7 @@ class CCS(BinaryBiclusteringBase):
             command = (
                 '{model} -t {thresh} -i {infile} -o {outfile} '
                 '-m {bases} -p {out_format} -g {overlap} {out_format}'
-                ''.format(model=self.MODEL, **self.params)
+                ''.format(model=self.model, **self.params)
             )
             subprocess.check_call(command.split())
 
@@ -1049,15 +628,18 @@ class CCS(BinaryBiclusteringBase):
         self.params['infile'] = os.path.abspath(self.path_data)
         self.params['outfile'] = os.path.join(
             os.path.abspath(self.path_dir),
-            '{}_results.{}'.format(self.MODEL, self.FILE_FORMAT)
+            '{0}.{1}'.format(self.OUTPUT_FILE, self.file_format)
         )
 
-    def collect_output(self, X):
+    def fetch_biclusters(self, X):
 
-        # NOTE: Need safe way to handle file names and directories
-        with open('./ccs_results/ccs_results.txt', 'r') as results:
-            rows, cols = [], []
-            header = results.readline().split()
+        results_file = os.path.join(
+            self.path_dir, '{0}.{1}'.format(self.OUTPUT_FILE, self.file_format)
+        )
+        with open(results_file, 'r') as infile:
+
+            header = infile.readline().split()
+            print(header)
 
     def format_output(self):
 
@@ -1067,45 +649,48 @@ class CCS(BinaryBiclusteringBase):
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
-    from sklearn.cluster.bicluster import SpectralBiclustering
-
 
     from sklearn.datasets import make_checkerboard
     from sklearn.datasets import samples_generator as sg
 
     from sklearn.metrics import consensus_score
 
-    # Generate sklearn sample dataš
+    # Generate sklearn sample data.
+    # rows: array of shape (n_clusters, X.shape[0],)
+    # columns: array of shape (n_clusters, X.shape[1],)
     target, rows, columns = make_checkerboard(
-        shape=(10, 5), n_clusters=(4, 3), noise=10, shuffle=False,
+        shape=(12, 5), n_clusters=(4, 3), noise=10, shuffle=False,
         random_state=0
     )
     data, row_idx, col_idx = sg._shuffle(target, random_state=0)
 
-
     # Use sklearn model as reference to output structure
-    ref_model = SpectralBiclustering()
-    ref_model.fit(data)
-    score = consensus_score(
-        ref_model.biclusters_, (rows[:, row_idx], columns[:, col_idx])
-    )
-    print('sk score: ', score)
+    #ref_model = SpectralBiclustering()
+    #ref_model.fit(data)
+    #rows, cols = ref_model.rows_, ref_model.columns_
+    #print(rows.shape, cols.shape)
 
-    model = ChengChurch()
-    model.fit_transform(data)
-    score = consensus_score(
-        model.biclusters_, (rows[:, row_idx], columns[:, col_idx])
-    )
-    print('CC score: ', score)
-
+    """
     model = Plaid()
     model.fit_transform(data)
-    score = consensus_score(
-        model.biclusters_, (rows[:, row_idx], columns[:, col_idx])
-    )
-    print('Plaid score: ', score)
+    rows, cols = model.rows_, model.columns_
+    print(rows.shape, cols.shape)
 
-    # TODO: CUDA accel
-    #model = CCS()
-    #model.fit(data)
-    ##model.transform(data)
+    model = XMotifs()
+    model.fit_transform(data)
+    rows, cols = model.rows_, model.columns_
+    print(rows.shape, cols.shape)
+
+    model = CPB()
+    biclusters = model.fit_transform(data)
+    score = consensus_score(
+            biclusters, (rows[:, row_idx], columns[:, col_idx])
+    )
+    print(score)
+    """
+
+    # NB: Super slow. Writes nothing to outfile check. Check if needs to
+    # change data or error with write output method.
+    model = CCS()
+    model.fit(data)
+    model.transform(data)
