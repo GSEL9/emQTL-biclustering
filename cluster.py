@@ -42,8 +42,10 @@ class ChengChurch(RBiclusterBase):
 
         self.method = method
 
-        # TODO: Iterate through kwargs, if any kwargs has key same as params,
-        # update value. Necessary for sklearn Grid Search
+        # Iterate through kwargs and update parameters.
+        for key in kwargs:
+            if key in self.params.keys():
+                self.params[key] = kwargs[key]
 
     def fit(self, X, y=None, **kwargs):
 
@@ -103,7 +105,10 @@ class Plaid(RBiclusterBase):
 
         self.method = method
 
-        # TODO: Iterate through kwargs and update self.params
+        # Iterate through kwargs and update parameters.
+        for key in kwargs:
+            if key in self.params.keys():
+                self.params[key] = kwargs[key]
 
     def fit(self, X, y=None, **kwargs):
 
@@ -154,8 +159,10 @@ class XMotifs(RBiclusterBase):
 
         self.method = method
 
-        # TODO: Iterate through kwargs, if any kwargs has key same as params,
-        # update value. Necessary for sklearn Grid Search
+        # Iterate through kwargs and update parameters.
+        for key in kwargs:
+            if key in self.params.keys():
+                self.params[key] = kwargs[key]
 
     def fit(self, X, y=None, **kwargs):
 
@@ -196,6 +203,11 @@ class Spectral:
         else:
             raise ValueError('Invalid model: `{}` not among [`bi`, `co`]'
                              ''.format(model))
+
+        # Iterate through kwargs and update parameters.
+        for key in kwargs:
+            if key in self.params.keys():
+                self.params[key] = kwargs[key]
 
     def fit(self, X, y=None, **kwargs):
 
@@ -364,7 +376,10 @@ class CPB(BinaryBiclusteringBase):
 
         super().__init__(model, file_format, temp)
 
-        # TODO: Iterate through kwargs and update self.params
+        # Iterate through kwargs and update parameters.
+        for key in kwargs:
+            if key in self.params.keys():
+                self.params[key] = kwargs[key]
 
     def fit(self, X, y=None, **kwargs):
 
@@ -543,7 +558,10 @@ class CCS(BinaryBiclusteringBase):
 
         super().__init__(model, file_format, temp)
 
-        # TODO: Iterate through kwargs and update self.params
+        # Iterate through kwargs and update parameters.
+        for key in kwargs:
+            if key in self.params.keys():
+                self.params[key] = kwargs[key]
 
     def fit(self, X, y=None, sep='\t', **kwargs):
 
@@ -659,7 +677,7 @@ if __name__ == '__main__':
     # rows: array of shape (n_clusters, X.shape[0],)
     # columns: array of shape (n_clusters, X.shape[1],)
     target, rows, columns = make_checkerboard(
-        shape=(12, 5), n_clusters=(4, 3), noise=10, shuffle=False,
+        shape=(500, 300), n_clusters=(4, 3), noise=10, shuffle=False,
         random_state=0
     )
     data, row_idx, col_idx = sg._shuffle(target, random_state=0)
@@ -680,17 +698,24 @@ if __name__ == '__main__':
     model.fit_transform(data)
     rows, cols = model.rows_, model.columns_
     print(rows.shape, cols.shape)
-
-    model = CPB()
-    biclusters = model.fit_transform(data)
-    score = consensus_score(
-            biclusters, (rows[:, row_idx], columns[:, col_idx])
-    )
-    print(score)
     """
+
+    new_params = {
+        'nclus': 1,
+        'targetpcc': 2,
+        'fixed_row': 3,
+        'fixed_col': 4,
+    }
+
+    model = CPB(**new_params)
+    #biclusters = model.fit_transform(data)
+    #score = consensus_score(
+    #        biclusters, (rows[:, row_idx], columns[:, col_idx])
+    #)
+    #print(score)
 
     # NB: Super slow. Writes nothing to outfile check. Check if needs to
     # change data or error with write output method.
-    model = CCS()
-    model.fit(data)
-    model.transform(data)
+    #model = CCS()
+    #model.fit(data)
+    #model.transform(data)
