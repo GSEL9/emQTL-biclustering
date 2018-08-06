@@ -392,7 +392,7 @@ class CPB(BinaryBiclusteringBase):
             if stem == self.STEM_OUTPUT_FILE:
 
                 output_file = os.path.join(results_dir, _file)
-                row_idx, col_idx = self.read_output_file(output_file, X)
+                row_idx, col_idx = self.format_output(output_file, X)
                 rows.append(row_idx), cols.append(col_idx)
 
                 num_biclusters += 1
@@ -408,7 +408,7 @@ class CPB(BinaryBiclusteringBase):
         self.rows_, self.columns_ = row_clusters, col_clusters
         self.biclusters_ = (self.rows_, self.columns_)
 
-    def read_output_file(self, filename, X):
+    def format_output(self, filename, X):
         """Reads the bicluster in a single CPB output file.
 
         Returns:
