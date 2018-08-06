@@ -24,12 +24,17 @@ from sklearn.cluster.bicluster import SpectralCoclustering
 
 
 class ChengChurch(RBiclusterBase):
-    """A wrapper for R BCCC algorithm.
+    """A wrapper for the R BCCC algorithm.
 
-    Args:
+    Kwargs:
+        delta ():
+        alpha ():
+        number ():
 
-    Returns:
-        (list):
+    Attributes:
+        rows_ ():
+        columns_ ():
+        biclusters_():
 
     """
 
@@ -75,7 +80,7 @@ class ChengChurch(RBiclusterBase):
 
 
 class Plaid(RBiclusterBase):
-    """A wrapper to R BCPlaid algorithm.
+    """A wrapper for R the BCPlaid algorithm.
 
     Args:
         method (str): The R biclust function method name.
@@ -85,6 +90,11 @@ class Plaid(RBiclusterBase):
             Defaults to both.
         model (str): The model formula to fit each layer. Defaults to linear
             model y ~ m + a + b.
+
+    Attributes:
+        rows_ ():
+        columns_ ():
+        biclusters_():
 
     """
 
@@ -138,7 +148,7 @@ class Plaid(RBiclusterBase):
 
 
 class XMotifs(RBiclusterBase):
-    """
+    """A wrapper for the R BCXmotifs algorithm.
 
     Args:
         number (int): Number of bicluster to be found.
@@ -146,6 +156,11 @@ class XMotifs(RBiclusterBase):
         nd (int): Number of determinants.
         sd (int): Size of discriminating set; generated for each seed.
         alpha (float): Scaling factor for column.
+
+    Attributes:
+        rows_ ():
+        columns_ ():
+        biclusters_():
 
     """
 
@@ -195,7 +210,12 @@ class XMotifs(RBiclusterBase):
 
 
 class Spectral:
-    """A scikit-learn wrapper for spectral biclustering algorithms.
+    """A wrapper for the scikit-learn spectral biclustering algorithms.
+
+    Attributes:
+        rows_ ():
+        columns_ ():
+        biclusters_():
 
     """
 
@@ -232,10 +252,10 @@ class CPB(BinaryBiclusteringBase):
 
     Detects biclusters based on row correlations.
 
-    Attribtues:
+    Attributes:
         rows_ ():
         columns_ ():
-        biclusters_ ():
+        biclusters_():
 
     """
 
