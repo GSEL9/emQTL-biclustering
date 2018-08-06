@@ -35,6 +35,8 @@ class ChengChurch(RBiclusterBase):
         rows_ ():
         columns_ ():
         biclusters_():
+        row_labels_ ():
+        column_labels_ ():
 
     """
 
@@ -95,6 +97,8 @@ class Plaid(RBiclusterBase):
         rows_ ():
         columns_ ():
         biclusters_():
+        row_labels_ ():
+        column_labels_ ():
 
     """
 
@@ -161,6 +165,8 @@ class XMotifs(RBiclusterBase):
         rows_ ():
         columns_ ():
         biclusters_():
+        row_labels_ ():
+        column_labels_ ():
 
     """
 
@@ -216,6 +222,8 @@ class Spectral:
         rows_ ():
         columns_ ():
         biclusters_():
+        row_labels_ ():
+        column_labels_ ():
 
     """
 
@@ -229,6 +237,16 @@ class Spectral:
         else:
             raise ValueError('Invalid model: `{}` not among [`bi`, `co`]'
                              ''.format(model))
+
+    @property
+    def row_labels_(self):
+
+        return self.model.row_labels_
+
+    @property
+    def column_labels_(self):
+
+        return self.model.column_labels_
 
     def fit(self, X, y=None, **kwargs):
 
@@ -256,6 +274,8 @@ class CPB(BinaryBiclusteringBase):
         rows_ ():
         columns_ ():
         biclusters_():
+        row_labels_ ():
+        column_labels_ ():
 
     """
 
@@ -334,12 +354,10 @@ class CPB(BinaryBiclusteringBase):
 
     def exec_clustering(self):
 
-        # Create file holding results.
-        self._results_file()
-
+        # Create a file to hold the results.
+        self.create_results_file()
         # Change to current working dir.
         current_loc = os.getcwd()
-
         try:
             os.chdir(self.path_dir)
             command = (
@@ -357,7 +375,9 @@ class CPB(BinaryBiclusteringBase):
         finally:
             os.chdir(current_loc)
 
-    def _results_file(self):
+        return self
+
+    def create_results_file(self):
 
         self.params['initfile'] = os.path.join(
             self.path_dir, 'initfile.{0}'.format(self.file_format)
@@ -380,6 +400,9 @@ class CPB(BinaryBiclusteringBase):
         return self
 
     def fetch_biclusters(self, X):
+        """
+
+        """
 
         results_dir = os.path.abspath(self.path_dir)
         dir_files = os.listdir(results_dir)
@@ -408,11 +431,17 @@ class CPB(BinaryBiclusteringBase):
         self.rows_, self.columns_ = row_clusters, col_clusters
         self.biclusters_ = (self.rows_, self.columns_)
 
+        return self
+
     def format_output(self, filename, X):
         """Reads the bicluster in a single CPB output file.
 
+        Args:
+            filename (str):
+            X (array-like):
+
         Returns:
-            (tuple): The bicluster row and column indices.
+            (tuple): The bicluster row and column indicators.
 
         """
 
@@ -428,6 +457,7 @@ class CPB(BinaryBiclusteringBase):
                     continue
                 else:
                     target.append(int(line.split()[0]))
+
             rows.sort(), cols.sort()
 
         return rows, cols
@@ -469,7 +499,11 @@ if __name__ == '__main__':
     print(rows.shape, cols.shape)
     """
 
-    new_params = {
+    model = Spectral()
+    model.fit_transform(data)
+    print(model.row_labels_)
+
+    """new_params = {
         'nclus': 5,
         'targetpcc': 5,
         'fixed_row': 3,
@@ -479,8 +513,7 @@ if __name__ == '__main__':
     biclusters = model.fit_transform(data)
     score = consensus_score(
             biclusters, (rows[:, row_idx], columns[:, col_idx])
-    )
-    print(score)
+    )"""
 
     # NB: Moved to temp.
     # NOTE: Super slow. Writes nothing to outfile check. Check if needs to
