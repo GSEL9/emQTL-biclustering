@@ -10,12 +10,15 @@ Various scikit-learn compatible clustering algorithms.
 __author__ = 'Severin E. R. Langberg'
 __email__ = 'Langberg91@gmail.no'
 
+
 import os
+import subprocess
 
 import numpy as np
 import rpy2.robjects as robjects
 
-from base import RBiclusterBase
+from utils import PathError
+from base import RBiclusterBase, BinaryBiclusteringBase
 from sklearn.cluster.bicluster import SpectralBiclustering
 from sklearn.cluster.bicluster import SpectralCoclustering
 
@@ -30,6 +33,7 @@ class ChengChurch(RBiclusterBase):
 
     """
 
+    # Hyperparameters
     params = {
         'delta': 0.1,
         'alpha': 1.5,
@@ -84,7 +88,7 @@ class Plaid(RBiclusterBase):
 
     """
 
-    # Algorithm parameters.
+    # Hyperparameters
     params = {
         'cluster': 'b',
         'fit.model': robjects.r('y ~ m + a + b'),
@@ -145,6 +149,7 @@ class XMotifs(RBiclusterBase):
 
     """
 
+    # Hyperparameters
     params = {
         'number': 1,
         'ns': 200,
@@ -196,6 +201,7 @@ class Spectral:
 
     def __init__(self, model='bi', **kwargs):
 
+        # NOTE: All kwargs are directly passed to algorithm.
         if model == 'bi':
             self.model = SpectralBiclustering(**kwargs)
         elif model == 'co':
@@ -203,11 +209,6 @@ class Spectral:
         else:
             raise ValueError('Invalid model: `{}` not among [`bi`, `co`]'
                              ''.format(model))
-
-        # Iterate through kwargs and update parameters.
-        for key in kwargs:
-            if key in self.params.keys():
-                self.params[key] = kwargs[key]
 
     def fit(self, X, y=None, **kwargs):
 
@@ -224,121 +225,6 @@ class Spectral:
         self.fit(X, y=y, **kwargs)
 
         return self.transform(X, y=y, **kwargs)
-
-
-
-
-
-"""Binary utility functions"""
-
-import os
-import shutil
-import tempfile
-import subprocess
-
-
-class PathError(Exception):
-    """Error raised if binary algorithm executable is not located on $PATH."""
-
-    def __init__(self, message):
-
-        super().__init__(message)
-
-
-class BinaryBiclusteringBase:
-    """
-
-    Attribtues:
-        binary ():
-        temp_dir ():
-
-    """
-
-    INPUT_FILE = 'input'
-
-    def __init__(self, model, file_format='txt', temp=False):
-
-        self.model = model#self.check_on_path(model)
-        self.file_format = file_format
-        self.temp = temp
-
-        # NOTE: Variables set with instance.
-        self.path_dir = None
-        self.path_data = None
-
-    # ERROR: Something mysterious goingin on
-    @staticmethod
-    def check_on_path(model, path_var='PATH'):
-        """Check if an executable is included in $PATH environment variable."""
-
-        def _is_exec(fpath):
-            #
-
-            return os.path.exists(fpath) and os.access(fpath, os.X_OK)
-
-        def _path_error(model):
-            # Raises path error if executable not found on path.
-
-            raise PathError('Executable {0} not on $PATH'.format(model))
-
-        fpath, fname = os.path.split(model)
-        if fpath:
-            if _is_exec(model):
-                return model
-        else:
-            for path in os.environ[path_var].split(os.pathsep):
-                exe_file = os.path.join(path, model)
-                if _is_exec(exe_file):
-                    return model
-
-    @property
-    def path_dir(self):
-
-        return self._path_dir
-
-    @path_dir.setter
-    def path_dir(self, value):
-
-        self._path_dir = value
-
-    @property
-    def path_data(self):
-
-        return self._path_data
-
-    @path_data.setter
-    def path_data(self, value):
-
-        if value is None:
-            return
-        else:
-            if isinstance(value, str):
-                self._path_data = value
-            else:
-                raise ValueError('file path should be <str>, not {}'
-                                 ''.format(type(value)))
-
-    def setup_io(self):
-        """Create dir holding formatted input data and raw output data."""
-
-        if self.temp:
-            self.path_dir = tempfile.mkdtemp()
-        else:
-            current_loc = os.getcwd()
-            dir_name = '{0}_data'.format(self.model)
-
-            self.path_dir = os.path.join(current_loc, dir_name)
-            if not os.path.exists(self.path_dir):
-                os.makedirs(self.path_dir)
-
-        self.path_data = os.path.join(
-            self.path_dir, '{0}.{1}'.format(self.INPUT_FILE, self.file_format)
-        )
-
-    def io_teardown_temp(self):
-
-        # Cleanup temporary directory
-        shutil.rmtree(self.path_dir)
 
 
 class CPB(BinaryBiclusteringBase):
@@ -453,10 +339,8 @@ class CPB(BinaryBiclusteringBase):
 
     def _results_file(self):
 
-        _path_dir = os.path.abspath(self.path_dir)
-        parent, _ = os.path.split(_path_dir)
         self.params['initfile'] = os.path.join(
-            parent, 'initfile.{0}'.format(self.file_format)
+            self.path_dir, 'initfile.{0}'.format(self.file_format)
         )
         self.params['init_binary'] = self.INIT_BINARY
 
@@ -529,141 +413,6 @@ class CPB(BinaryBiclusteringBase):
         return rows, cols
 
 
-class CCS(BinaryBiclusteringBase):
-    """
-
-    Args:
-        thresh (float): A correlation threshold in range [0, 1]. Defaults to
-            0.8.
-
-    Attribtues:
-        biclusters (list):
-
-    """
-
-    # Name of the file containing the algorithm output.
-    OUTPUT_FILE = 'output'
-
-    # The standard dimensions of the input file
-    FILE_DIMS = 'Genes/Conditions'
-
-    params = {
-        'thresh': 0.8,
-        'bases': 1000,
-        'overlap': 100.0,
-        'out_format': 0
-    }
-
-    def __init__(self, model='ccs', file_format='txt', temp=False, **kwargs):
-
-        super().__init__(model, file_format, temp)
-
-        # Iterate through kwargs and update parameters.
-        for key in kwargs:
-            if key in self.params.keys():
-                self.params[key] = kwargs[key]
-
-    def fit(self, X, y=None, sep='\t', **kwargs):
-
-        #_X = check_array(X)
-
-        # Call to base method to set paths for temp dir and data.
-        self.setup_io()
-        # Creates file of input data according to algorithm requirements.
-        self.format_input(X, sep=sep)
-        # Call to application
-        self.exec_clustering()
-
-    def transform(self, X, y=None, **kwargs):
-
-        # TODO: Check is fitted
-
-        self.fetch_biclusters(X)
-
-        #if self.temp:
-        #    self.io_teardown_temp()
-
-        #return self.biclusters_
-
-    def fit_transform(self, X, y=None, **kwargs):
-
-        self.fit(X, y=y, **kwargs)
-
-        return self.transform(X, y=y, **kwargs)
-
-    def format_input(self, X, sep='\t', **kwargs):
-
-        try:
-            rows = kwargs['']
-        except:
-            rows = ['row{0}'.format(str(num)) for num in range(X.shape[0])]
-        try:
-            cols = kwargs['genes']
-        except:
-            cols = [
-                '{0}col{1}'.format(sep, str(num)) for num in range(X.shape[1])
-            ]
-        with open(self.path_data, 'w') as outfile:
-            outfile.write(self.FILE_DIMS)
-            outfile.write(('').join(cols))
-            outfile.write('\n')
-            for num, row in enumerate(X):
-                outfile.write('{0}{1}'.format(rows[num], sep))
-                outfile.write(
-                    ('').join(['{0}{1}'.format(sep, str(val)) for val in row])
-                )
-                outfile.write('\n')
-            outfile.close()
-
-        return self
-
-    def exec_clustering(self):
-
-        # Create file holding results
-        self._setup_exec()
-
-        # Change to current working dir
-        current_loc = os.getcwd()
-
-        try:
-            os.chdir(self.path_dir)
-            # ccs -t 0.9 -i input_file -o output_file -m 50 -p 1 -g 100.0
-            command = (
-                '{model} -t {thresh} -i {infile} -o {outfile} '
-                '-m {bases} -p {out_format} -g {overlap} {out_format}'
-                ''.format(model=self.model, **self.params)
-            )
-            subprocess.check_call(command.split())
-
-        except OSError:
-            raise PathError('Executable {0} not on $PATH'.format(value))
-
-        finally:
-            os.chdir(current_loc)
-
-    def _setup_exec(self):
-
-        self.params['infile'] = os.path.abspath(self.path_data)
-        self.params['outfile'] = os.path.join(
-            os.path.abspath(self.path_dir),
-            '{0}.{1}'.format(self.OUTPUT_FILE, self.file_format)
-        )
-
-    def fetch_biclusters(self, X):
-
-        results_file = os.path.join(
-            self.path_dir, '{0}.{1}'.format(self.OUTPUT_FILE, self.file_format)
-        )
-        with open(results_file, 'r') as infile:
-
-            header = infile.readline().split()
-            print(header)
-
-    def format_output(self):
-
-        pass
-
-
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
@@ -701,20 +450,20 @@ if __name__ == '__main__':
     """
 
     new_params = {
-        'nclus': 1,
-        'targetpcc': 2,
+        'nclus': 5,
+        'targetpcc': 5,
         'fixed_row': 3,
         'fixed_col': 4,
     }
-
     model = CPB(**new_params)
-    #biclusters = model.fit_transform(data)
-    #score = consensus_score(
-    #        biclusters, (rows[:, row_idx], columns[:, col_idx])
-    #)
-    #print(score)
+    biclusters = model.fit_transform(data)
+    score = consensus_score(
+            biclusters, (rows[:, row_idx], columns[:, col_idx])
+    )
+    print(score)
 
-    # NB: Super slow. Writes nothing to outfile check. Check if needs to
+    # NB: Moved to temp.
+    # NOTE: Super slow. Writes nothing to outfile check. Check if needs to
     # change data or error with write output method.
     #model = CCS()
     #model.fit(data)

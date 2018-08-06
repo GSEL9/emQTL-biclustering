@@ -10,7 +10,11 @@ The emQTL-mining base module.
 __author__ = 'Severin E. R. Langberg'
 __email__ = 'Langberg91@gmail.no'
 
+
+import os
+import shutil
 import logging
+import tempfile
 import warnings
 import rpy2.robjects.numpy2ri
 
@@ -21,6 +25,7 @@ from rpy2.rinterface import RRuntimeError
 from rpy2.rinterface import RRuntimeWarning
 
 rpy2.robjects.numpy2ri.activate()
+
 
 verbose = False
 if not verbose:
@@ -139,3 +144,100 @@ class RBiclusterBase:
             else:
                 raise RuntimeError('Invalid formatted array returned from {}'
                                    ''.format(model_name))
+
+
+
+class BinaryBiclusteringBase:
+    """
+
+    Attribtues:
+        binary ():
+        temp_dir ():
+
+    """
+
+    INPUT_FILE = 'input'
+
+    def __init__(self, model, file_format='txt', temp=False):
+
+        self.model = model#self.check_on_path(model)
+        self.file_format = file_format
+        self.temp = temp
+
+        # NOTE: Variables set with instance.
+        self.path_dir = None
+        self.path_data = None
+
+    # ERROR: Something mysterious goingin on
+    @staticmethod
+    def check_on_path(model, path_var='PATH'):
+        """Check if an executable is included in $PATH environment variable."""
+
+        def _is_exec(fpath):
+            #
+
+            return os.path.exists(fpath) and os.access(fpath, os.X_OK)
+
+        def _path_error(model):
+            # Raises path error if executable not found on path.
+
+            raise PathError('Executable {0} not on $PATH'.format(model))
+
+        fpath, fname = os.path.split(model)
+        if fpath:
+            if _is_exec(model):
+                return model
+        else:
+            for path in os.environ[path_var].split(os.pathsep):
+                exe_file = os.path.join(path, model)
+                if _is_exec(exe_file):
+                    return model
+
+    @property
+    def path_dir(self):
+
+        return self._path_dir
+
+    @path_dir.setter
+    def path_dir(self, value):
+
+        self._path_dir = value
+
+    @property
+    def path_data(self):
+
+        return self._path_data
+
+    @path_data.setter
+    def path_data(self, value):
+
+        if value is None:
+            return
+        else:
+            if isinstance(value, str):
+                self._path_data = value
+            else:
+                raise ValueError('file path should be <str>, not {}'
+                                 ''.format(type(value)))
+
+    def setup_io(self):
+        """Create dir holding formatted input data and raw output data."""
+
+        if self.temp:
+            self.path_dir = tempfile.mkdtemp()
+        else:
+            current_loc = os.getcwd()
+            dir_name = '{0}_data'.format(self.model)
+
+            self.path_dir = os.path.join(current_loc, dir_name)
+            if not os.path.exists(self.path_dir):
+                os.makedirs(self.path_dir)
+
+        self.path_data = os.path.join(
+            self.path_dir, '{0}.{1}'.format(self.INPUT_FILE, self.file_format)
+        )
+
+    def io_teardown_temp(self):
+
+        # Cleanup temporary directory
+        shutil.rmtree(self.path_dir)
