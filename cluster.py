@@ -279,30 +279,6 @@ class Spectral:
 
         return self.transform(X, y=y, **kwargs)
 
-    def score(self, target_coords, pred_coords):
-        """Computes the Jaccard coefficient as a measure of similarity between
-        two sets of biclusters.
-
-        Args:
-            target_coords (tuple): The original row and column bicluster
-                indicators.
-            pred_coords (tuple): The predicted row and column bicluster
-                indicators.
-
-        Returns:
-            (float): The Jaccard coefficient value.
-
-        """
-
-        rows, cols = target_coords
-        row_idx, col_idx = pred_coords
-
-        score = consensus_score(
-            self.biclusters_, (rows[:, row_idx], columns[:, col_idx])
-        )
-
-        return score
-
 
 if __name__ == '__main__':
 
