@@ -289,8 +289,11 @@ class Spectral:
             pred_coords (tuple): The predicted row and column bicluster
                 indicators.
 
+        Returns:
+            (float): The Jaccard coefficient value.
+
         """
-        
+
         rows, cols = target_coords
         row_idx, col_idx = pred_coords
 
