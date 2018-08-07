@@ -254,6 +254,16 @@ class Spectral:
                              ''.format(model))
 
     @property
+    def rows_(self):
+
+        return self.model.rows_
+
+    @property
+    def columns_(self):
+
+        return self.model.columns_
+
+    @property
     def row_labels_(self):
 
         return self.model.row_labels_
@@ -282,6 +292,21 @@ class Spectral:
 
 if __name__ == '__main__':
 
-    # QUESTION: How to visualize the clustering result?
+    import datasets
+    import pandas as pd
 
-    pass
+    data_feats = pd.read_csv(
+        './../data/data_characteristics.csv', sep='\t', index_col=0
+    )
+
+    feats = data_feats.loc[data_feats.index[0], :]
+    data, _, _ = datasets.gen_biclusters(
+        feats, sparse=False, shape=(300, 200), n_clusters=4, seed=0
+    )
+
+    model = Spectral()
+    rows, cols = model.fit_transform(data)
+
+    print(rows.shape)
+    print(cols.shape)
+    print(model.rows_.shape, model.columns_.shape)
