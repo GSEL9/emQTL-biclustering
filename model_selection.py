@@ -17,7 +17,7 @@ __author__ = 'Severin E. R. Langberg'
 __email__ = 'Langberg91@gmail.no'
 
 
-import time
+import numpy as np
 
 from sklearn.model_selection import GridSearchCV
 from sklearn.utils.validation import check_array
@@ -52,18 +52,22 @@ class Experiment:
         self.dummy_cv = [(slice(None), slice(None))]
 
         # NOTE: Attributes set with instance.
-        self.grid = None
-        self.model_stats = None
+        self.grids = None
+        self.results = None
 
         self._data = None
         self._rows = None
         self._cols = None
 
+    # ERROR: Must gen report with results from all four classes of test data
     @property
-    def gen_gs_report(self):
+    def performance_report(self):
         """Generates and returns a report with grid search results."""
 
-        # NOTE: Only one CV split => avg score = score from single run.
+        for grid in self.grids:
+            pass
+
+        """# NOTE: Only one CV split => avg score = score from single run.
         target_cols = ['split0_test_score', 'mean_fit_time', 'params']
 
         # Collect unnecessary column labels.
@@ -83,9 +87,10 @@ class Experiment:
         )
         report.index.name = 'param_grid_num'
 
-        return report
+        return report"""
 
-    def execute(self, data, indicators):
+
+    def execute(self, data, indicators, gen_report=True):
         """Performs model comparison for each class of test data."""
 
         rows, cols = indicators
@@ -93,7 +98,7 @@ class Experiment:
         if self.verbose:
             print('Experiment initiated:\n{}'.format('-' * 21))
 
-        self.model_stats = {}
+        self.results, self.grids = {}, []
         for key in data.keys():
 
             if self.verbose:
@@ -103,7 +108,7 @@ class Experiment:
             self._rows, self._cols = rows[key], cols[key]
 
             # Holds the winning model for each class of test data.
-            self.model_stats[key] = self.compare_models()
+            self.results[key] = self.compare_models()
 
             #return self
 
@@ -122,22 +127,24 @@ class Experiment:
         for model, param_grid in self.models_and_params:
 
             # Determine the best hyperparameter combo for that model
-            self.grid = GridSearchCV(
+            grid = GridSearchCV(
                 SpectralBiclustering(random_state=self.seed),
                 param_grid, scoring=self.jaccard, cv=self.dummy_cv,
                 return_train_score=True
             )
-            self.grid.fit(_train_std, y=None)
+            grid.fit(_train_std, y=None)
 
             if self.verbose:
                 print(
                     'Model performance:\nName: {}\nScore: {}\n'
-                     ''.format(model.__name__, self.grid.best_score_)
+                     ''.format(model.__name__, grid.best_score_)
                 )
 
-            if self.grid.best_score_ > best_score:
-                best_score = self.grid.best_score_
-                winning_model = model.__name__
+            if grid.best_score_ > best_score:
+                best_score = grid.best_score_
+                winning_model = {model.__name__: model(**grid.best_params_)}
+
+            self.grids.append(grid)
 
         return winning_model
 
@@ -172,24 +179,6 @@ if __name__ == '__main__':
 
     SEED = 0
 
-    # NOTE: Grid Search
-    # * Do not want to optimize with respect to the number of clusters. Pass
-    #   the correct number of clusters to allow optimization of other params.
-    # * Passing data to execute() and not constructor allows running
-    #   experiments with same models and params over different datasets.
-
-    # NOTE: Experiment
-    # * One execution = one run for each class of test data with given models
-    #   and params.
-    # * When conducting experiments (in ipynb) with a generated test dataset,
-    #   run the same experiment with the same dataset again as second
-    #   parallell addressing variability between experiments.
-    # * Record the winning model for each class of test data. The model with
-    #   the most wins per test data class is the recommended model for clustering
-    #   that type of data.
-    # * Necessary to standardize data in order to avoid sklearn inf/NaN error.
-    #   Also necessary to standardize when clustering reference data?
-
     data_feats = pd.read_csv(
         './../data/data_characteristics.csv', sep='\t', index_col=0
     )
@@ -209,8 +198,9 @@ if __name__ == '__main__':
     ]
 
     # Parallell num 1
-    experiment = Experiment(models_and_params, verbose=True)
+    experiment = Experiment(models_and_params, verbose=False)
     experiment.execute(test_data, (test_rows, test_cols))
-    print(experiment.model_stats)
+
+    print(experiment.results)
 
     # Paralell num 2
