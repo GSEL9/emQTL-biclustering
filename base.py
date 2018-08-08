@@ -24,7 +24,7 @@ import rpy2.robjects as robjects
 from rpy2.rinterface import RRuntimeError
 from rpy2.rinterface import RRuntimeWarning
 
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 rpy2.robjects.numpy2ri.activate()
@@ -35,7 +35,7 @@ if not verbose:
     warnings.filterwarnings('ignore', category=RRuntimeWarning)
 
 
-class RBiclusterBase(BaseEstimator):
+class RBiclusterBase(BaseEstimator, ClusterMixin):
 
     FUNCTION = 'biclust'
 
@@ -43,19 +43,37 @@ class RBiclusterBase(BaseEstimator):
     MIN_ROWS = 2
     MIN_COLS = 2
 
-    def __init__(self):
+    def __init__(self, random_state=0, **kwargs):
+
+        self.random_state = random_state
+
+        # Update parameters.
+        for key in kwargs:
+            if key in self.params.keys():
+                self.params[key] = kwargs[key]
+
+        self.set_params(**kwargs)
 
         # NOTE:
         self._output = None
 
-        #self.rows_ = None
-        #self.columns_ = None
-        #self.biclusters_ = None
+        self.rows_ = None
+        self.columns_ = None
+        self.biclusters_ = None
 
-        self.row_labels_ = None
-        self.column_labels_ = None
+    def set_params(self, **kwargs):
 
-    """@property
+        # Assign parameters to attributes.
+        for key, value in self.params.items():
+            # Add underscore instead of dot to attribute
+            _key = key.replace('.', '_')
+            setattr(self, _key, kwargs.get(_key, value))
+
+    def get_params(self, deep=False):
+
+        return self.params
+
+    @property
     def rows_(self):
 
         return self._rows
@@ -104,8 +122,19 @@ class RBiclusterBase(BaseEstimator):
                 self._biclusters = value
             else:
                 raise ValueError('Biclusters should be <tuple>, not {}'
-                                 ''.format(type(value)))"""
+                                 ''.format(type(value)))
 
+    def _fit(self, model, X, params):
+
+        # Run R biclustering algorithm.
+        self.execute_r_function(model, X, params)
+
+        # Format R biclustering algorithm output to numpy.narray.
+        self.rows_, self.cols_ = self.fetch_biclusters(X)
+        # Assign to attribute.
+        self.biclusters_ = (self.rows_, self.cols_)
+
+        return self
 
     def execute_r_function(self, method, data, params):
         """Executes the R function with given data and parameters."""
@@ -142,8 +171,7 @@ class RBiclusterBase(BaseEstimator):
         row_mat, col_mat = self.filter_bilusters(
             row_mat_form, col_mat_form
         )
-        print('row mat', np.shape(row_mat))
-        print('col mat', np.shape(col_mat))
+
         return row_mat, col_mat
 
     @staticmethod
