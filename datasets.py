@@ -22,19 +22,19 @@ import pandas as pd
 from sklearn.datasets import make_biclusters
 
 
-def gen_test_sets(feats, sparse, **kwargs):
+def gen_test_sets(feats, sparse, non_neg, **kwargs):
     """Generate datasets with similar characteristics to reference datasets."""
 
     datasets, rows, columns = {}, {}, {}
-    for sparse, key in zip(sparse, feats.index):
+    for key_num, key in enumerate(feats.index):
         datasets[key], rows[key], columns[key] = gen_biclusters(
-            feats.loc[key, :], sparse=sparse, **kwargs
+            feats.loc[key, :], sparse[key_num], non_neg[key], **kwargs
         )
 
     return datasets, rows, columns
 
 
-def gen_biclusters(feats, sparse=False, **kwargs):
+def gen_biclusters(feats, sparse=False, non_neg=False, **kwargs):
     """Geenrates synthetic biclsuter data from reference characteristics.
 
     Args:
@@ -61,13 +61,18 @@ def gen_biclusters(feats, sparse=False, **kwargs):
         random_state=kwargs['seed'],
         shuffle=False
     )
-    # Suppress negative values occuring from the noise term.
-    data = np.absolute(_data)
-
+    # Detmerine if suppressing negative values occuring from the noise term,
+    # and filtering values from threshold.
     if sparse:
-        return percentile_filter(data, feats), rows, columns
+        if non_neg:
+            return percentile_filter(np.absolute(_data), feats), rows, columns
+        else:
+            return percentile_filter(_data, feats), rows, columns
     else:
-        return data, rows, columns
+        if non_neg:
+            return np.absolute(_data)
+        else:
+            return _data
 
 
 def percentile_filter(data, feats):
