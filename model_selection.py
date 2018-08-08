@@ -39,7 +39,7 @@ class Experiment:
 
     """
 
-    def __init__(self, models_and_params, verbose=True, seed=None):
+    def __init__(self, models_and_params, verbose=1, seed=None):
 
         self.models_and_params = models_and_params
         self.verbose = verbose
@@ -95,13 +95,13 @@ class Experiment:
 
         rows, cols = indicators
 
-        if self.verbose:
+        if self.verbose > 0:
             print('Experiment initiated:\n{}'.format('-' * 21))
 
         self.results, self.grids = {}, []
         for key in data.keys():
 
-            if self.verbose:
+            if self.verbose > 0:
                 print('Training set: `{}`'.format(key))
 
             self._data = data[key]
@@ -110,7 +110,7 @@ class Experiment:
             # Holds the winning model for each class of test data.
             self.results[key] = self.compare_models()
 
-            #return self
+        return self
 
     def compare_models(self):
         """Compare the performance of models with optimal hyperparemeter
@@ -133,7 +133,7 @@ class Experiment:
             )
             grid.fit(_train_std, y=None)
 
-            if self.verbose:
+            if self.verbose > 1:
                 print(
                     'Model performance:\nName: {}\nScore: {}\n'
                      ''.format(model.__name__, grid.best_score_)
@@ -142,6 +142,12 @@ class Experiment:
             if grid.best_score_ > best_score:
                 best_score = grid.best_score_
                 winning_model = {model.__name__: model(**grid.best_params_)}
+
+            if self.verbose > 0:
+                print(
+                    'Winning model :\nName: {}\nScore: {}\n'
+                     ''.format(winning_model, best_score)
+                )
 
             self.grids.append(grid)
 
