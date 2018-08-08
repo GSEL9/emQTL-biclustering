@@ -23,12 +23,27 @@ from sklearn.datasets import make_biclusters
 
 
 def gen_test_sets(feats, sparse, non_neg, **kwargs):
-    """Generate datasets with similar characteristics to reference datasets."""
+    """Generate datasets with similar characteristics to reference datasets.
+
+    Args:
+        feats (pandas.DataFrame): The characteristics of each dataset to be
+            generated. The requirements are max, min and std.
+        sparse (list): Boolean indicators to whether the data is generated as
+            sparse or not.
+        non_neg (list): Boolean indicators to whether the generated data
+            contains negative values or not.
+
+    Returns:
+        (tuple):
+
+    """
 
     datasets, rows, columns = {}, {}, {}
     for key_num, key in enumerate(feats.index):
         datasets[key], rows[key], columns[key] = gen_biclusters(
-            feats.loc[key, :], sparse[key_num], non_neg[key], **kwargs
+            feats.loc[key, :],
+            sparse=sparse[key_num], non_neg=non_neg[key_num],
+            **kwargs
         )
 
     return datasets, rows, columns
@@ -70,9 +85,9 @@ def gen_biclusters(feats, sparse=False, non_neg=False, **kwargs):
             return percentile_filter(_data, feats), rows, columns
     else:
         if non_neg:
-            return np.absolute(_data)
+            return np.absolute(_data), rows, columns
         else:
-            return _data
+            return _data, rows, columns
 
 
 def percentile_filter(data, feats):
@@ -104,17 +119,19 @@ if __name__ == '__main__':
 
     import numpy as np
     import pandas as pd
-    import seaborn as sns
-    import matplotlib.pyplot as plt
 
     from sklearn.datasets import samples_generator as sgen
 
     # Characteristics samples from experimental data
-
     data_feats = pd.read_csv(
         './../data/data_characteristics.csv', sep='\t', index_col=0
     )
+    # NOTE: Every other dataset is sparse and the oposite sets contains negative values
     test_data, rows, cols = gen_test_sets(
-        data_feats, sparse=[False, True, False, True],
-        shape=(500, 300), n_clusters=5, seed=0
+        data_feats,
+        sparse=[False, True, False, True],
+        non_neg=[False, True, False, True],
+        shape=(500, 300),
+        n_clusters=5,
+        seed=0
     )
