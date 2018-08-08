@@ -23,10 +23,10 @@ from sklearn.datasets import make_biclusters
 
 
 def gen_test_sets(feats, sparse, **kwargs):
+    """Generate datasets with similar characteristics to reference datasets."""
 
     datasets, rows, columns = {}, {}, {}
     for sparse, key in zip(sparse, feats.index):
-        print(sparse, key)
         datasets[key], rows[key], columns[key] = gen_biclusters(
             feats.loc[key, :], sparse=sparse, **kwargs
         )
