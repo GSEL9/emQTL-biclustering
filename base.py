@@ -24,6 +24,9 @@ import rpy2.robjects as robjects
 from rpy2.rinterface import RRuntimeError
 from rpy2.rinterface import RRuntimeWarning
 
+from sklearn.base import BaseEstimator
+
+
 rpy2.robjects.numpy2ri.activate()
 
 
@@ -32,23 +35,27 @@ if not verbose:
     warnings.filterwarnings('ignore', category=RRuntimeWarning)
 
 
-class RBiclusterBase:
+class RBiclusterBase(BaseEstimator):
 
     FUNCTION = 'biclust'
+
+    # Limits to bicluster size
+    MIN_ROWS = 2
+    MIN_COLS = 2
 
     def __init__(self):
 
         # NOTE:
         self._output = None
 
-        self.rows_ = None
-        self.columns_ = None
-        self.biclusters_ = None
+        #self.rows_ = None
+        #self.columns_ = None
+        #self.biclusters_ = None
 
         self.row_labels_ = None
         self.column_labels_ = None
 
-    @property
+    """@property
     def rows_(self):
 
         return self._rows
@@ -97,11 +104,15 @@ class RBiclusterBase:
                 self._biclusters = value
             else:
                 raise ValueError('Biclusters should be <tuple>, not {}'
-                                 ''.format(type(value)))
+                                 ''.format(type(value)))"""
 
 
     def execute_r_function(self, method, data, params):
         """Executes the R function with given data and parameters."""
+
+        # NOTE: Replace underscore with dot for valid R params.
+        for key in params:
+            params[key.replace('_', '.')] = params.pop(key)
 
         # Import function from R library.
         robjects.r.library(self.FUNCTION)
@@ -120,31 +131,59 @@ class RBiclusterBase:
         # Set rows and columns attributes.
 
         # Collect logical R matrices of biclusters rows and columns.
-        _row_mat = np.array(self._output.do_slot('RowxNumber'), dtype=bool)
-        _col_mat = np.array(self._output.do_slot('NumberxCol'), dtype=bool)
+        row_mat_raw = np.array(self._output.do_slot('RowxNumber'), dtype=bool)
+        col_mat_raw = np.array(self._output.do_slot('NumberxCol'), dtype=bool)
 
-        row_mat, col_mat = self._check_cluster_coords(_row_mat, _col_mat, X)
-
-        self.rows_, self.columns_ = row_mat.T, col_mat
-        self.biclusters_ = (self.rows_, self.columns_)
+        # NOTE: Necessary to format biclusters before filtereing in case
+        # wrong shape (missleading in )
+        row_mat_form, col_mat_form = self.format_biclusters(
+            row_mat_raw, col_mat_raw, X
+        )
+        row_mat, col_mat = self.filter_bilusters(
+            row_mat_form, col_mat_form
+        )
+        print('row mat', np.shape(row_mat))
+        print('col mat', np.shape(col_mat))
+        return row_mat, col_mat
 
     @staticmethod
-    def _check_cluster_coords(row_mat, col_mat, X):
-        # NOTE: Cheng and Church can sometimes return column matrix transpose.
+    def format_biclusters(row_mat, col_mat, X):
+        # Format row and column biclusters.
 
-        num_clusters = row_mat.shape[1]
-        if num_clusters == col_mat.shape[0]:
-            return row_mat, col_mat
+        num_rows, num_cols = np.shape(X)
+        row_mat_rows, row_mat_cols = np.shape(row_mat)
+        col_mat_rows, col_mat_cols = np.shape(col_mat)
 
-        else:
-
-            rows_cols = (row_mat.shape[0], col_mat.shape[0])
-            if num_clusters == col_mat.shape[1] and rows_cols == X.shape:
-                return row_mat, col_mat.T
+        # Row clusters: (n_row_clusters, n_rows)
+        if row_mat_rows == num_rows:
+            # Col clusters: (n_column_clusters, n_columns)
+            if col_mat_cols == num_cols:
+                return row_mat.T, col_mat
             else:
-                raise RuntimeError('Invalid formatted array returned from {}'
-                                   ''.format(model_name))
+                return row_mat.T, col_mat.T
+        else:
+            if col_mat_cols == num_cols:
+                return row_mat, col_mat
+            else:
+                return row_mat, col_mat.T
 
+    def filter_bilusters(self, row_mat, col_mat):
+
+        row_mat_rows, row_mat_cols = np.shape(row_mat)
+        col_mat_rows, col_mat_cols = np.shape(col_mat)
+
+        # Filtering by size
+        if row_mat_rows < self.MIN_ROWS and row_mat_cols < self.MIN_COLS:
+            _row_mat = []
+        else:
+            _row_mat = row_mat
+
+        if col_mat_rows < self.MIN_ROWS and col_mat_cols < self.MIN_COLS:
+            _col_mat = []
+        else:
+            _col_mat = col_mat
+
+        return _row_mat, _col_mat
 
 
 class BinaryBiclusteringBase:
