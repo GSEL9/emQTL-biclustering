@@ -23,26 +23,11 @@ from base import RBiclusterBase, BinaryBiclusteringBase
 from sklearn.cluster.bicluster import SpectralBiclustering
 from sklearn.cluster.bicluster import SpectralCoclustering
 
-# TEMP:
-from sklearn.base import BaseEstimator, ClusterMixin
-
 
 class ChengChurch(RBiclusterBase):
-    """A wrapper for the R BCCC algorithm.
+    """A wrapper for the R BCCC algorithm."""
 
-    Kwargs:
-        delta ():
-        alpha ():
-        number ():
-
-    Attributes:
-        rows_ ():
-        columns_ ():
-        biclusters_():
-        row_labels_ ():
-        column_labels_ ():
-
-    """
+    MODEL = 'BCCC'
 
     # Hyperparameters
     params = {
@@ -51,46 +36,35 @@ class ChengChurch(RBiclusterBase):
         'number': 100
     }
 
-    def __init__(self, method='BCCC', **kwargs):
+    def __init__(self, random_state=0, **kwargs):
 
-        super().__init__()
+        super().__init__(random_state, **kwargs)
 
-        self.method = method
-
-        # Iterate through kwargs and update parameters.
+        # Update parameters.
         for key in kwargs:
             if key in self.params.keys():
                 self.params[key] = kwargs[key]
 
+        self.set_params(**kwargs)
+
+        # NOTE:
+        self._output = None
+
+        self.rows_ = None
+        self.columns_ = None
+        self.biclusters_ = None
+
     def fit(self, X, y=None, **kwargs):
 
-        # Run R biclustering algorithm.
-        self.execute_r_function(self.method, X, self.params)
-
-        # Format R biclustering algorithm output to numpy.narray.
-        self.fetch_biclusters(X)
+        self._fit(self.MODEL, X, self.params)
 
         return self
 
 
 class XMotifs(RBiclusterBase):
-    """A wrapper for the R BCXmotifs algorithm.
+    """A wrapper for the R BCXmotifs algorithm."""
 
-    Args:
-        number (int): Number of bicluster to be found.
-        ns (int): Number of seeds.
-        nd (int): Number of determinants.
-        sd (int): Size of discriminating set; generated for each seed.
-        alpha (float): Scaling factor for column.
-
-    Attributes:
-        rows_ ():
-        columns_ ():
-        biclusters_():
-        row_labels_ ():
-        column_labels_ ():
-
-    """
+    MODEL = 'BCXmotifs'
 
     # Hyperparameters
     params = {
@@ -101,29 +75,29 @@ class XMotifs(RBiclusterBase):
         'alpha': 0.05
     }
 
-    def __init__(self, method='BCXmotifs', **kwargs):
+    def __init__(self, random_state=0, **kwargs):
 
-        super().__init__()
+        super().__init__(random_state, **kwargs)
 
-        self.method = method
-
-        # Iterate through kwargs and update parameters.
+        # Update parameters.
         for key in kwargs:
             if key in self.params.keys():
                 self.params[key] = kwargs[key]
 
+        self.set_params(**kwargs)
+
+        # NOTE:
+        self._output = None
+
+        self.rows_ = None
+        self.columns_ = None
+        self.biclusters_ = None
+
     def fit(self, X, y=None, **kwargs):
 
-        X_discrete = X.astype(int)
-
-        # Run R biclustering algorithm.
-        self.execute_r_function(self.method, X_discrete, self.params)
-
-        # Format R biclustering algorithm output to numpy.narray.
-        self.fetch_biclusters(X)
+        self._fit(self.MODEL, X, self.params)
 
         return self
-
 
 class BiMax:
 
@@ -136,26 +110,10 @@ class BiMax:
         binary_data = np.where(a>threshold, upper, lower)
 
 
-class Plaid(RBiclusterBase, BaseEstimator, ClusterMixin):
-    """A wrapper for R the BCPlaid algorithm.
+class Plaid(RBiclusterBase):
+    """A wrapper for R the BCPlaid algorithm."""
 
-    Args:
-        method (str): The R biclust function method name.
-
-    Kwargs:
-        cluster (str, {r, c, b}): Determines to cluster rows, columns or both.
-            Defaults to both.
-        model (str): The model formula to fit each layer. Defaults to linear
-            model y ~ m + a + b.
-
-    Attributes:
-        rows_ ():
-        columns_ ():
-        biclusters_():
-        row_labels_ ():
-        column_labels_ ():
-
-    """
+    MODEL = 'BCPlaid'
 
     # Hyperparameters
     params = {
@@ -175,9 +133,7 @@ class Plaid(RBiclusterBase, BaseEstimator, ClusterMixin):
 
     def __init__(self, random_state=0, **kwargs):
 
-        super().__init__()
-
-        self.random_state = random_state
+        super().__init__(random_state, **kwargs)
 
         # Update parameters.
         for key in kwargs:
@@ -193,41 +149,9 @@ class Plaid(RBiclusterBase, BaseEstimator, ClusterMixin):
         self.columns_ = None
         self.biclusters_ = None
 
-    @property
-    def biclusters_(self):
-
-        return self._biclusters
-
-    @biclusters_.setter
-    def biclusters_(self, value):
-
-        if value is None:
-            return
-        else:
-            # TODO: Type checking
-            self._biclusters = value
-
-    def set_params(self, **kwargs):
-
-        # Assign parameters to attributes.
-        for key, value in self.params.items():
-            # Add underscore instead of dot to attribute
-            _key = key.replace('.', '_')
-            setattr(self, _key, kwargs.get(_key, value))
-
-    def get_params(self, deep=False):
-
-        return self.params
-
     def fit(self, X, y=None, **kwargs):
 
-        # Run R biclustering algorithm.
-        self.execute_r_function('BCPlaid', X, self.params)
-
-        # Format R biclustering algorithm output to numpy.narray.
-        self.rows_, self.cols_ = self.fetch_biclusters(X)
-        # Assign to attribute.
-        self.biclusters_ = (self.rows_, self.cols_)
+        self._fit(self.MODEL, X, self.params)
 
         return self
 
@@ -259,16 +183,21 @@ if __name__ == '__main__':
     )
     rmodels_and_params = [
         (
-            Plaid, {
-                'row_release': [0.5, 0.7],
+            XMotifs, {
+                'ns': [200, 300, 400],
             }
         ),
     ]
 
-    #X = test_data[data_feats.index[0]]
-    #test_rows = rows[data_feats.index[0]]
-    #test_cols = cols[data_feats.index[0]]
 
+    data = test_data[data_feats.index[0]]
+    _rows = rows[data_feats.index[0]]
+    _cols = cols[data_feats.index[0]]
+
+    for key in test_data.keys():
+        test_data[key] = data
+        rows[key] = _rows
+        cols[key] = _cols
 
     """data, rows, columns = make_biclusters(
         shape=(500, 500), n_clusters=5, noise=5,
@@ -291,7 +220,7 @@ if __name__ == '__main__':
     #)
     #print(score)
 
-    experiment = model_selection.Experiment(rmodels_and_params, verbose=1)
+    experiment = model_selection.Experiment(rmodels_and_params, verbose=2)
     experiment.execute(test_data, (rows, cols), target='score')
     #for num, (test_data, test_rows, test_cols) in enumerate(cluster_exp_data):
     #    experiment.execute(test_data, (test_rows, test_cols), target='score')
