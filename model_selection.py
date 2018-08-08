@@ -128,9 +128,8 @@ class Experiment:
 
             # Determine the best hyperparameter combo for that model
             grid = GridSearchCV(
-                SpectralBiclustering(random_state=self.seed),
-                param_grid, scoring=self.jaccard, cv=self.dummy_cv,
-                return_train_score=True
+                model(random_state=self.seed), param_grid,
+                scoring=self.jaccard, cv=self.dummy_cv, return_train_score=True
             )
             grid.fit(_train_std, y=None)
 
@@ -169,7 +168,6 @@ class Experiment:
 
 if __name__ == '__main__':
 
-    import numpy as np
     import pandas as pd
 
     from sklearn.cluster import SpectralBiclustering
