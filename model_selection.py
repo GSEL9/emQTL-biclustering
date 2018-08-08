@@ -45,17 +45,19 @@ class Experiment:
         self.verbose = verbose
         self.seed = seed
 
-        # NOTE: Necessary to scale data in order to avoid sklearn inf/NaN error.
+        # NOTE: Necessary to scale data to avoid sklearn inf/NaN error.
         self.scaler = StandardScaler()
+
         # NOTE: A cross val split producing only train and no test split.
         self.dummy_cv = [(slice(None), slice(None))]
 
         # NOTE: Attributes set with instance.
-        self.data = None
-        self.rows = None
-        self.cols = None
-        # The latest (after executing) model selection grid search object
         self.grid = None
+        self.model_stats = None
+
+        self._data = None
+        self._rows = None
+        self._cols = None
 
     @property
     def gen_gs_report(self):
@@ -69,9 +71,11 @@ class Experiment:
         for key in self.grid.cv_results_.keys():
             if key not in target_cols:
                 droppings.append(key)
+
         # Remove unnecessary columns.
         for key in droppings:
             self.grid.cv_results_.pop(key)
+
         # Create a properly formatted pandas.DataFrame
         report = pd.DataFrame(
             self.grid.cv_results_, columns=['score', 'train_time', 'params']
@@ -81,27 +85,27 @@ class Experiment:
 
         return report
 
-    # NOTE: Passing data to execute() and not constructor allows running
-    # experiments with same models and params over different datasets.
     def execute(self, data, indicators):
-        """Performs a model comparison experiment by applying """
+        """Performs model comparison for each class of test data."""
 
         rows, cols = indicators
 
         if self.verbose:
-            print('Experiment initiated:')
+            print('Experiment initiated:\n{}'.format('-' * 21))
 
-        for key in test_data.keys():
+        self.model_stats = {}
+        for key in data.keys():
 
             if self.verbose:
-                print('Training set: {}'.format(key))
+                print('Training set: `{}`'.format(key))
 
-            self.data, self.rows, self.cols = data[key], rows[key], cols[key]
+            self._data = data[key]
+            self._rows, self._cols = rows[key], cols[key]
 
-            self.compare_models()
+            # Holds the winning model for each class of test data.
+            self.model_stats[key] = self.compare_models()
 
-            # Determines the winning model for each class of test data
-            #self.model_stats[key] = self.best_estimator_
+            #return self
 
     def compare_models(self):
         """Compare the performance of models with optimal hyperparemeter
@@ -110,11 +114,11 @@ class Experiment:
         """
 
         _train, self.row_idx, self.col_idx = sgen._shuffle(
-            self.data, random_state=self.seed
+            self._data, random_state=self.seed
         )
-        train = self.scaler.fit_transform(_train)
+        _train_std = self.scaler.fit_transform(_train)
 
-        best_score = -np.float('inf')
+        winning_model, best_score = None, -np.float('inf')
         for model, param_grid in self.models_and_params:
 
             # Determine the best hyperparameter combo for that model
@@ -123,15 +127,21 @@ class Experiment:
                 param_grid, scoring=self.jaccard, cv=self.dummy_cv,
                 return_train_score=True
             )
-            self.grid.fit(train, y=None)
+            self.grid.fit(_train_std, y=None)
 
             if self.verbose:
-                print('Model performance:')
-                self.performance_report(model.__name__)
+                print(
+                    'Model performance:\nName: {}\nScore: {}\n'
+                     ''.format(model.__name__, self.grid.best_score_)
+                )
 
-        return self
+            if self.grid.best_score_ > best_score:
+                best_score = self.grid.best_score_
+                winning_model = model.__name__
 
-    def jaccard(self, estimator, train):
+        return winning_model
+
+    def jaccard(self, estimator, train=None):
         """Computes the Jaccard coefficient as a measure of similarity between
         two sets of biclusters.
 
@@ -145,17 +155,9 @@ class Experiment:
         """
 
         ypred = estimator.biclusters_
-        ytrue = (self.rows[:, self.row_idx], self.cols[:, self.col_idx])
+        ytrue = (self._rows[:, self.row_idx], self._cols[:, self.col_idx])
 
         return consensus_score(ypred, ytrue)
-
-    def performance_report(self, name):
-        """Prints a model performance report including training and test scores,
-        and the difference between the training and test scores."""
-
-        print('Name: {}\nScore: {}\n'.format(name, self.grid.best_score_))
-
-        return self
 
 
 if __name__ == '__main__':
@@ -170,16 +172,11 @@ if __name__ == '__main__':
 
     SEED = 0
 
-    data_feats = pd.read_csv(
-        './../data/data_characteristics.csv', sep='\t', index_col=0
-    )
-    test_data, test_rows, test_cols = gen_test_sets(
-        data_feats, sparse=True, shape=(500, 300), n_clusters=3, seed=SEED
-    )
-
     # NOTE: Grid Search
     # * Do not want to optimize with respect to the number of clusters. Pass
     #   the correct number of clusters to allow optimization of other params.
+    # * Passing data to execute() and not constructor allows running
+    #   experiments with same models and params over different datasets.
 
     # NOTE: Experiment
     # * One execution = one run for each class of test data with given models
@@ -187,8 +184,18 @@ if __name__ == '__main__':
     # * When conducting experiments (in ipynb) with a generated test dataset,
     #   run the same experiment with the same dataset again as second
     #   parallell addressing variability between experiments.
-    # * The model stats storing the number of winning sessinos per model is
-    #   created and maintained in the ipynb.
+    # * Record the winning model for each class of test data. The model with
+    #   the most wins per test data class is the recommended model for clustering
+    #   that type of data.
+    # * Necessary to standardize data in order to avoid sklearn inf/NaN error.
+    #   Also necessary to standardize when clustering reference data?
+
+    data_feats = pd.read_csv(
+        './../data/data_characteristics.csv', sep='\t', index_col=0
+    )
+    test_data, test_rows, test_cols = gen_test_sets(
+        data_feats, sparse=True, shape=(500, 300), n_clusters=3, seed=SEED
+    )
 
     models_and_params = [
         (
@@ -201,5 +208,9 @@ if __name__ == '__main__':
         )
     ]
 
-    experiment = Experiment(models_and_params)
+    # Parallell num 1
+    experiment = Experiment(models_and_params, verbose=True)
     experiment.execute(test_data, (test_rows, test_cols))
+    print(experiment.model_stats)
+
+    # Paralell num 2
