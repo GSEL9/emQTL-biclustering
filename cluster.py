@@ -19,9 +19,9 @@ import rpy2.robjects as robjects
 
 from utils import PathError
 from base import RBiclusterBase, BinaryBiclusteringBase
+
 from sklearn.cluster.bicluster import SpectralBiclustering
 from sklearn.cluster.bicluster import SpectralCoclustering
-from sklearn.metrics import consensus_score
 
 
 class ChengChurch(RBiclusterBase):
@@ -64,22 +64,10 @@ class ChengChurch(RBiclusterBase):
         # Run R biclustering algorithm.
         self.execute_r_function(self.method, X, self.params)
 
-        return self
-
-    def transform(self, X, y=None, **kwargs):
-
-        # TODO: Check is fitted
-
         # Format R biclustering algorithm output to numpy.narray.
         self.fetch_biclusters(X)
 
-        return self.biclusters_
-
-    def fit_transform(self, X, y=None, **kwargs):
-
-        self.fit(X, y=y, **kwargs)
-
-        return self.transform(X, y=y, **kwargs)
+        return self
 
 
 class Plaid(RBiclusterBase):
@@ -134,22 +122,10 @@ class Plaid(RBiclusterBase):
         # Run R biclustering algorithm.
         self.execute_r_function(self.method, X, self.params)
 
-        return self
-
-    def transform(self, X, y=None, **kwargs):
-
-        # TODO: Check is fitted
-
         # Format R biclustering algorithm output to numpy.narray.
         self.fetch_biclusters(X)
 
-        return self.biclusters_
-
-    def fit_transform(self, X, y=None, **kwargs):
-
-        self.fit(X, y=y, **kwargs)
-
-        return self.transform(X, y=y, **kwargs)
+        return self
 
 
 class XMotifs(RBiclusterBase):
@@ -198,22 +174,10 @@ class XMotifs(RBiclusterBase):
         # Run R biclustering algorithm.
         self.execute_r_function(self.method, X_discrete, self.params)
 
-        return self
-
-    def transform(self, X, y=None, **kwargs):
-
-        # TODO: Check is fitted
-
         # Format R biclustering algorithm output to numpy.narray.
         self.fetch_biclusters(X)
 
-        return self.biclusters_
-
-    def fit_transform(self, X, y=None, **kwargs):
-
-        self.fit(X, y=y, **kwargs)
-
-        return self.transform(X, y=y, **kwargs)
+        return self
 
 
 if __name__ == '__main__':
