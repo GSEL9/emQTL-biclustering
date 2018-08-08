@@ -4,24 +4,17 @@
 #
 
 """
-Various scikit-learn compatible clustering algorithms.
+Wrappers for R biclustering algorithms.
 """
 
 __author__ = 'Severin E. R. Langberg'
 __email__ = 'Langberg91@gmail.no'
 
 
-import os
-import subprocess
-
 import numpy as np
 import rpy2.robjects as robjects
 
-from utils import PathError
-from base import RBiclusterBase, BinaryBiclusteringBase
-
-from sklearn.cluster.bicluster import SpectralBiclustering
-from sklearn.cluster.bicluster import SpectralCoclustering
+from base import RBiclusterBase
 
 
 class ChengChurch(RBiclusterBase):
@@ -99,16 +92,6 @@ class XMotifs(RBiclusterBase):
 
         return self
 
-class BiMax:
-
-    def __init__(self):
-
-        pass
-
-    def fit(self, X, y=None, **kwargs):
-
-        binary_data = np.where(a>threshold, upper, lower)
-
 
 class Plaid(RBiclusterBase):
     """A wrapper for R the BCPlaid algorithm."""
@@ -183,13 +166,11 @@ if __name__ == '__main__':
     )
     rmodels_and_params = [
         (
-            XMotifs, {
-                'ns': [200, 300, 400],
+            ChengChurch, {
+                'delta': [0.1, 0.2],
             }
         ),
     ]
-
-
     data = test_data[data_feats.index[0]]
     _rows = rows[data_feats.index[0]]
     _cols = cols[data_feats.index[0]]
@@ -199,28 +180,5 @@ if __name__ == '__main__':
         rows[key] = _rows
         cols[key] = _cols
 
-    """data, rows, columns = make_biclusters(
-        shape=(500, 500), n_clusters=5, noise=5,
-        shuffle=False, random_state=0)
-    data, row_idx, col_idx = sg._shuffle(X, random_state=0)
-
-
-    ref_mod = SpectralBiclustering()
-    ref_mod.fit(data)
-
-    ref_score = consensus_score(
-        ref_mod.biclusters_, (rows[:, row_idx], columns[:, col_idx])
-    )
-    print(ref_score)"""
-
-    #model = Plaid()
-    #model.fit(data)
-    #score = consensus_score(
-    #    model.biclusters_, (rows[:, row_idx], columns[:, col_idx])
-    #)
-    #print(score)
-
     experiment = model_selection.Experiment(rmodels_and_params, verbose=2)
     experiment.execute(test_data, (rows, cols), target='score')
-    #for num, (test_data, test_rows, test_cols) in enumerate(cluster_exp_data):
-    #    experiment.execute(test_data, (test_rows, test_cols), target='score')
