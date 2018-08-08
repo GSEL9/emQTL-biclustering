@@ -25,6 +25,8 @@ from sklearn.metrics import consensus_score
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.datasets import samples_generator as sgen
 
+from sklearn.preprocessing import StandardScaler
+
 
 class Experiment:
     """Perform experiments by applying an algorithm to data and measure the
@@ -43,6 +45,8 @@ class Experiment:
         self.verbose = verbose
         self.seed = seed
 
+        # NOTE: Necessary to scale data in order to avoid sklearn inf/NaN error.
+        self.scaler = StandardScaler()
         # NOTE: A cross val split producing only train and no test split.
         self.dummy_cv = [(slice(None), slice(None))]
 
@@ -50,16 +54,14 @@ class Experiment:
         self.data = None
         self.rows = None
         self.cols = None
-        # The latest (in case of execute()) model selection grid search object 
+        # The latest (after executing) model selection grid search object
         self.grid = None
-        self.best_model = None
-        #
-        self.model_stats = None
 
     @property
     def gen_gs_report(self):
         """Generates and returns a report with grid search results."""
 
+        # NOTE: Only one CV split => avg score = score from single run.
         target_cols = ['split0_test_score', 'mean_fit_time', 'params']
 
         # Collect unnecessary column labels.
@@ -87,34 +89,35 @@ class Experiment:
         rows, cols = indicators
 
         if self.verbose:
-            print('Conducting experiment:')
+            print('Experiment initiated:')
 
-        self.model_stats = {}
         for key in test_data.keys():
 
             if self.verbose:
                 print('Training set: {}'.format(key))
 
-            self.model_stats[key] = {}
             self.data, self.rows, self.cols = data[key], rows[key], cols[key]
 
-            self.model_selection()
+            self.compare_models()
 
-    def model_selection(self):
+            # Determines the winning model for each class of test data
+            #self.model_stats[key] = self.best_estimator_
+
+    def compare_models(self):
         """Compare the performance of models with optimal hyperparemeter
         settings obtained from a grid search.
 
         """
 
-        train, self.row_idx, self.col_idx = sgen._shuffle(
+        _train, self.row_idx, self.col_idx = sgen._shuffle(
             self.data, random_state=self.seed
         )
-        # Completes a single run over the data with each model.
+        train = self.scaler.fit_transform(_train)
+
+        best_score = -np.float('inf')
         for model, param_grid in self.models_and_params:
 
-            if self.verbose:
-                print('Testing model: {}'.format(model.__name__))
-
+            # Determine the best hyperparameter combo for that model
             self.grid = GridSearchCV(
                 SpectralBiclustering(random_state=self.seed),
                 param_grid, scoring=self.jaccard, cv=self.dummy_cv,
@@ -122,13 +125,8 @@ class Experiment:
             )
             self.grid.fit(train, y=None)
 
-            # Best estimator from the grid search (i.e. the model fitted with
-            # the optimal param combo) = self.grid.best_estimator_
-            #
-
-            # QUESTION: How to determine th ebest model for this data?
-
             if self.verbose:
+                print('Model performance:')
                 self.performance_report(model.__name__)
 
         return self
@@ -149,19 +147,15 @@ class Experiment:
         ypred = estimator.biclusters_
         ytrue = (self.rows[:, self.row_idx], self.cols[:, self.col_idx])
 
-        score = consensus_score(ypred, ytrue)
-
-        return score
+        return consensus_score(ypred, ytrue)
 
     def performance_report(self, name):
         """Prints a model performance report including training and test scores,
         and the difference between the training and test scores."""
 
-        print('Model performance', '\n{}'.format('-' * 24))
-        print('Name: {}'.format(name))
+        print('Name: {}\nScore: {}\n'.format(name, self.grid.best_score_))
 
-
-        print('Avg train time {}')
+        return self
 
 
 if __name__ == '__main__':
@@ -186,8 +180,6 @@ if __name__ == '__main__':
     # NOTE: Grid Search
     # * Do not want to optimize with respect to the number of clusters. Pass
     #   the correct number of clusters to allow optimization of other params.
-    # * With only one CV split (test dataset), the avg params are actually the
-    #   results for the whole run (which goes into the gs report).
 
     # NOTE: Experiment
     # * One execution = one run for each class of test data with given models
@@ -195,20 +187,19 @@ if __name__ == '__main__':
     # * When conducting experiments (in ipynb) with a generated test dataset,
     #   run the same experiment with the same dataset again as second
     #   parallell addressing variability between experiments.
+    # * The model stats storing the number of winning sessinos per model is
+    #   created and maintained in the ipynb.
 
     models_and_params = [
         (
             SpectralBiclustering,
             {'n_clusters': [3], 'method': ['log', 'bistochastic']}
         ),
-        #(
-        #    SpectralCoclustering,
-        #    {'n_clusters': [2, 4]}
-        #)
+        (
+            SpectralCoclustering,
+            {'n_clusters': [3], }
+        )
     ]
-
-    data = test_data[data_feats.index[0]]
-    rows, cols = test_rows[data_feats.index[0]], test_cols[data_feats.index[0]]
 
     experiment = Experiment(models_and_params)
     experiment.execute(test_data, (test_rows, test_cols))
