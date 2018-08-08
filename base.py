@@ -131,6 +131,7 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
 
         # Format R biclustering algorithm output to numpy.narray.
         self.rows_, self.cols_ = self.fetch_biclusters(X)
+
         # Assign to attribute.
         self.biclusters_ = (self.rows_, self.cols_)
 
