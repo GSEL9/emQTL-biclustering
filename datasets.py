@@ -22,10 +22,11 @@ import pandas as pd
 from sklearn.datasets import make_biclusters
 
 
-def gen_test_sets(feats, sparse=False, **kwargs):
+def gen_test_sets(feats, sparse, **kwargs):
 
     datasets, rows, columns = {}, {}, {}
-    for key in feats.index:
+    for sparse, key in zip(sparse, feats.index):
+        print(sparse, key)
         datasets[key], rows[key], columns[key] = gen_biclusters(
             feats.loc[key, :], sparse=sparse, **kwargs
         )
@@ -101,8 +102,6 @@ if __name__ == '__main__':
     import seaborn as sns
     import matplotlib.pyplot as plt
 
-    # Start of with a checkerboard and modify the data
-
     from sklearn.datasets import samples_generator as sgen
 
     # Characteristics samples from experimental data
@@ -111,5 +110,6 @@ if __name__ == '__main__':
         './../data/data_characteristics.csv', sep='\t', index_col=0
     )
     test_data, rows, cols = gen_test_sets(
-        data_feats, sparse=True, shape=(500, 300), n_clusters=3, seed=0
+        data_feats, sparse=[False, True, False, True],
+        shape=(500, 300), n_clusters=5, seed=0
     )
