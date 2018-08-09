@@ -18,7 +18,11 @@ from base import RBiclusterBase
 
 
 class ChengChurch(RBiclusterBase):
-    """A wrapper for the R BCCC algorithm."""
+    """A wrapper for the R BCCC algorithm.
+
+    Constant values
+
+    """
 
     MODEL = 'BCCC'
 
@@ -26,7 +30,7 @@ class ChengChurch(RBiclusterBase):
     params = {
         'delta': 0.1,
         'alpha': 1.5,
-        'number': 100
+        'number': 10
     }
 
     def __init__(self, random_state=0, **kwargs):
@@ -55,13 +59,17 @@ class ChengChurch(RBiclusterBase):
 
 
 class XMotifs(RBiclusterBase):
-    """A wrapper for the R BCXmotifs algorithm."""
+    """A wrapper for the R BCXmotifs algorithm.
+
+    Coherent  correlation  over  rows and  columns
+
+    """
 
     MODEL = 'BCXmotifs'
 
     # Hyperparameters
     params = {
-        'number': 1,
+        'number': 10,
         'ns': 200,
         'nd': 100,
         'sd': 5,
@@ -94,7 +102,11 @@ class XMotifs(RBiclusterBase):
 
 
 class Plaid(RBiclusterBase):
-    """A wrapper for R the BCPlaid algorithm."""
+    """A wrapper for R the BCPlaid algorithm.
+
+    Constant values over rows or columns
+
+    """
 
     MODEL = 'BCPlaid'
 
@@ -111,7 +123,7 @@ class Plaid(RBiclusterBase):
         'iter_startup': 5,
         'iter_layer': 10,
         'back_fit': 0,
-        'verbose': False
+        'verbose': False,
     }
 
     def __init__(self, random_state=0, **kwargs):
@@ -141,44 +153,50 @@ class Plaid(RBiclusterBase):
 
 if __name__ == '__main__':
 
-    import datasets
-    import model_selection
+    import bibench.all as bb
 
     import numpy as np
-    import pandas as pd
+    from matplotlib import pyplot as plt
 
-    from sklearn.datasets import samples_generator as sgen
-    from sklearn.cluster import SpectralBiclustering
-    from sklearn.metrics import consensus_score
-    from sklearn.datasets import make_biclusters
+    """
+    import os
+
+    from rpy2 import robjects as r
+    try:
+        from rpy2.robjects.packages import importr
+    except ImportError:
+        from rpy2.interactive import importr
+
+    #enables automatic conversion from numpy to R
+    import rpy2.robjects.numpy2ri
+
+    rpy2.robjects.numpy2ri.activate()
+
+    #from bibench.bicluster import get_row_col_matrices
+    """
+    import numpy as np
+    from matplotlib import pyplot as plt
+
+
+    from sklearn.datasets import make_biclusters, make_checkerboard
     from sklearn.datasets import samples_generator as sg
+    from sklearn.cluster.bicluster import SpectralCoclustering
+    from sklearn.metrics import consensus_score
 
-    data_feats = pd.read_csv(
-        './../data/data_characteristics.csv', sep='\t', index_col=0
-    )
-    test_data, rows, cols = datasets.gen_test_sets(
-        data_feats,
-        sparse=[False, True, False, True],
-        non_neg=[False, True, False, True],
-        shape=(500, 300),
-        n_clusters=5,
-        seed=0
-    )
-    rmodels_and_params = [
-        (
-            ChengChurch, {
-                'delta': [0.1, 0.2],
-            }
-        ),
-    ]
-    data = test_data[data_feats.index[0]]
-    _rows = rows[data_feats.index[0]]
-    _cols = cols[data_feats.index[0]]
+    n_clusters = 9
+    #data, rows, columns = make_biclusters(
+    #    shape=(300, 200), n_clusters=n_clusters, noise=5,
+    #    shuffle=False, random_state=0)
 
-    for key in test_data.keys():
-        test_data[key] = data
-        rows[key] = _rows
-        cols[key] = _cols
+    data, rows, columns = make_checkerboard(
+        shape=(50, 10), n_clusters=n_clusters, noise=5,
+        shuffle=False, random_state=0)
 
-    experiment = model_selection.Experiment(rmodels_and_params, verbose=2)
-    experiment.execute(test_data, (rows, cols), target='score')
+    shuf, row_idx, col_idx = sg._shuffle(data, random_state=0)
+
+    model = SpectralCoclustering(
+        n_clusters=n_clusters,random_state=0)
+    model.fit(data)
+
+    #model2 = Plaid()
+    #model2.fit(data)
