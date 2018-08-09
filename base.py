@@ -45,7 +45,7 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
 
     def __init__(self, random_state=0, **kwargs):
 
-        self.random_state = random_state
+        robjects.r('set.seed({})'.format(random_state))
 
         # Update parameters.
         for key in kwargs:
@@ -130,10 +130,10 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
         self.execute_r_function(model, X, params)
 
         # Format R biclustering algorithm output to numpy.narray.
-        self.rows_, self.cols_ = self.fetch_biclusters(X)
+        self.rows_, self.columns_ = self.fetch_biclusters(X)
 
         # Assign to attribute.
-        self.biclusters_ = (self.rows_, self.cols_)
+        self.biclusters_ = (self.rows_, self.columns_)
 
         return self
 
@@ -157,6 +157,7 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
 
         return self
 
+    # NOTE: Add attr with code to extract row and col labels
     def fetch_biclusters(self, X):
         # Set rows and columns attributes.
 
