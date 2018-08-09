@@ -7,10 +7,7 @@
 Model selection framework.
 
 The framework applies models with different hyperparemeter settings to classes
-of test data. For each model, the the Jaccard coefficient and the time
-complexity is recorded.
-size.
-
+of test data. For each model, the the Jaccard coefficient is recorded.
 """
 
 __author__ = 'Severin E. R. Langberg'
@@ -201,6 +198,9 @@ class Experiment:
         """Computes the Jaccard coefficient as a measure of similarity between
         two sets of biclusters.
 
+        Compare two bicluster results
+        Percentage of datapoints in the same cluster.
+
         Args:
             estimator ():
             train: Ignored
@@ -299,53 +299,3 @@ class MultiExperiment(Experiment):
                 self._tracker.update_stats(self.results)
 
         return self
-
-
-if __name__ == '__main__':
-
-    import testsets
-    import pandas as pd
-
-    from sklearn.cluster import SpectralBiclustering
-    from sklearn.cluster import SpectralCoclustering
-
-    SEED = 0
-
-    data_feats = pd.read_csv(
-        './../data/data_characteristics.csv', sep='\t', index_col=0
-    )
-    array_size = (1000, 100)
-    var_num_clusters = [2, 4, 8]
-    # NOTE: Each list element is a tuple of data, rows, cols
-    cluster_exp_data = [
-        testsets.gen_test_sets(
-            data_feats, sparse=[False, True, False, True],
-            non_neg=[False, True, False, True],
-            shape=array_size, n_clusters=n_clusters, seed=0
-        )
-        for n_clusters in var_num_clusters
-    ]
-
-    skmodels_and_params = [
-    (
-        SpectralBiclustering, {
-            'n_clusters': var_num_clusters, 'method': ['log', 'bistochastic'],
-            'n_components': [6, 9, 12], 'n_best': [3, 6]
-        }
-    ),
-    (
-        SpectralCoclustering, {'n_clusters': var_num_clusters}
-    )
-]
-
-    sk_multi_exper = MultiExperiment(skmodels_and_params, verbose=0)
-    sk_multi_exper.execute_all(cluster_exp_data, data_feats.index)
-    print(sk_multi_exper.best_models)
-    print(sk_multi_exper.class_winners)
-    print(sk_multi_exper.performance_report)
-    print(sk_multi_exper.model_votes)
-
-    # Collects:
-    # * Names and num wins of each model : num_model_wins
-    # * The winner models with hparams for each test class: best_models
-    # * The scores for each winner model: winner_stats
