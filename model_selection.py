@@ -20,6 +20,7 @@ __email__ = 'Langberg91@gmail.no'
 import operator
 
 import numpy as np
+import pandas as pd
 
 from sklearn.model_selection import GridSearchCV
 from sklearn.utils.validation import check_array
