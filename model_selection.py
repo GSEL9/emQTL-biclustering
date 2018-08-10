@@ -232,8 +232,6 @@ class MultiExperiment(Experiment):
 
         super().__init__(models_and_params, verbose, random_state)
 
-        self.nruns = nruns
-
         # NOTE:
         self._tracker = None
         self._multi_results = None
@@ -282,7 +280,7 @@ class MultiExperiment(Experiment):
 
         self._tracker = PerformanceTracker(test_classes, self.model_labels)
 
-        for run_num in range(self.nruns):
+        for run_num in range(nruns):
 
             if self.verbose > 0:
                 print('Experiment parallel number: {}'.format(run_num + 1))
