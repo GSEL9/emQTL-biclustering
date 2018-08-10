@@ -123,11 +123,13 @@ class Experiment:
         self._data = None
         self._rows = None
         self._cols = None
+        self._n_clusters = None
 
-    def execute(self, data, indicators, target='score'):
+    def execute(self, data, indicators, n_clusters, target='score'):
         """Performs model comparison for each class of test data."""
 
         rows, cols = indicators
+        self._n_clusters = n_clusters
 
         if self.verbose > 0:
             print('Experiment initiated:\n{}'.format('-' * 21))
@@ -164,6 +166,7 @@ class Experiment:
 
         return self
 
+    # NB: The n_clusters param might cause problems with R wrappers.
     def score_eval(self):
         """Compare the model performance with respect to a score metric."""
 
@@ -177,7 +180,8 @@ class Experiment:
 
             # Determine the best hyperparameter combo for that model
             grid = GridSearchCV(
-                model(random_state=self.random_state), param_grid,
+                model(random_state=self.random_state, n_clusters=n_clusters),
+                param_grid,
                 scoring=self.jaccard, cv=self.dummy_cv,
                 return_train_score=True, refit=False
             )
