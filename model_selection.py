@@ -228,7 +228,7 @@ class Experiment:
 
 class MultiExperiment(Experiment):
 
-    def __init__(self, models_and_params, nruns=1, verbose=1, random_state=1):
+    def __init__(self, models_and_params, verbose=1, random_state=None):
 
         super().__init__(models_and_params, verbose, random_state)
 
@@ -278,9 +278,10 @@ class MultiExperiment(Experiment):
 
         return [model.__name__ for model, _ in self.models_and_params]
 
-    def execute_all(self, dataset, test_classes, target='score'):
+    def execute_all(self, dataset, test_classes, nruns=1, target='score'):
 
         self._tracker = PerformanceTracker(test_classes, self.model_labels)
+
         for run_num in range(self.nruns):
 
             if self.verbose > 0:
