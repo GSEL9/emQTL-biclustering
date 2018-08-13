@@ -105,9 +105,10 @@ class Experiment:
 
     """
 
-    def __init__(self, models_and_params, verbose=1, random_state=None):
+    def __init__(self, grid, n_clusters=None, random_state=None, verbose=1):
 
-        self.models_and_params = models_and_params
+        self.grid = grid
+        self.n_clusters = n_clusters
         self.verbose = verbose
         self.random_state = random_state
 
@@ -125,17 +126,16 @@ class Experiment:
         self._cols = None
         self._n_clusters = None
 
-    def execute(self, data, indicators, n_clusters, target='score'):
+    def execute(self, data, indicators, target='score'):
         """Performs model comparison for each class of test data."""
 
         rows, cols = indicators
-        self._n_clusters = n_clusters
 
         if self.verbose > 0:
             print('Experiment initiated:\n{}'.format('-' * 21))
 
         self.results, self.grids = {}, []
-        for key in data.keys():
+        for num, key in enumerate(data.keys()):
 
             if self.verbose > 0:
                 print('Training set: `{}`'.format(key))
@@ -144,30 +144,16 @@ class Experiment:
             self._rows, self._cols = rows[key], cols[key]
 
             # Winning model, hest hparams, best score
-            self.results[key] = self.compare_models(target=target)
-
+            self.results[key] = self.compare_models(
+                target=target, n_clusters=self._rows.shape[0]
+            )
             if self.verbose > 0:
                 name, _, score = self.results[key]
                 print('Best model: {}\nScore: {}\n'.format(name, score))
 
         return self
 
-    def compare_models(self, target):
-        """Compare model performance on target basis."""
-
-        # Evaluates model performance by score value.
-        if target == 'score':
-            return self.score_eval()
-        # Evaluates model performance by time complexity.
-        elif target == 'time':
-            return self.time_eval()
-        else:
-            raise ValueError('Invalid target: `{}`'.format(target))
-
-        return self
-
-    # NB: The n_clusters param might cause problems with R wrappers.
-    def score_eval(self):
+    def compare_models(self, target, n_clusters):
         """Compare the model performance with respect to a score metric."""
 
         _train, self.row_idx, self.col_idx = sgen._shuffle(
@@ -176,25 +162,27 @@ class Experiment:
         _train_std = self.scaler.fit_transform(_train)
 
         winning_model, best_params, best_score = None, None, -np.float('inf')
-        for model, param_grid in self.models_and_params:
+        for model, param_grid in self.grid:
 
             # Determine the best hyperparameter combo for that model
-            grid = GridSearchCV(
-                model(random_state=self.random_state, n_clusters=n_clusters),
+            _grid = GridSearchCV(
+                model(
+                    random_state=self.random_state, n_clusters=n_clusters
+                ),
                 param_grid,
                 scoring=self.jaccard, cv=self.dummy_cv,
                 return_train_score=True, refit=False
             )
-            grid.fit(_train_std, y=None)
+            _grid.fit(_train_std, y=None)
 
             if self.verbose > 1:
                 print('Model performance:\nName: {}\nScore: {}\n'
-                      ''.format(model.__name__, grid.best_score_))
+                      ''.format(model.__name__, _grid.best_score_))
 
-            if grid.best_score_ > best_score:
-                best_score = grid.best_score_
+            if _grid.best_score_ > best_score:
+                best_score = _grid.best_score_
                 winner_name = model.__name__
-                winner_model = model(**grid.best_params_)
+                winner_model = model(**_grid.best_params_)
 
         return (winner_name, winner_model, best_score)
 
@@ -215,6 +203,7 @@ class Experiment:
         """
 
         rows, cols = estimator.biclusters_
+
         if len(rows) == 0 or len(cols) == 0:
             return 0.0
         else:
@@ -222,19 +211,11 @@ class Experiment:
             return consensus_score((rows, cols), ytrue)
 
 
-    # NOTE:
-    # * Not performing grid search, but only logging time of fitting
-    #   model to data?
-    def time_eval(self):
-
-        pass
-
-
 class MultiExperiment(Experiment):
 
-    def __init__(self, models_and_params, verbose=1, random_state=None):
+    def __init__(self, grid, n_clusters=None, random_state=None, verbose=1):
 
-        super().__init__(models_and_params, verbose, random_state)
+        super().__init__(grid, n_clusters, random_state, verbose)
 
         # NOTE:
         self._tracker = None
@@ -278,12 +259,13 @@ class MultiExperiment(Experiment):
     @property
     def model_labels(self):
 
-        return [model.__name__ for model, _ in self.models_and_params]
+        return [model.__name__ for model, _ in self.grid]
 
     def execute_all(self, dataset, test_classes, nruns=1, target='score'):
 
-        self._tracker = PerformanceTracker(test_classes, self.model_labels)
-
+        self._tracker = PerformanceTracker(
+            test_classes, self.model_labels
+        )
         for run_num in range(nruns):
 
             if self.verbose > 0:
@@ -296,9 +278,50 @@ class MultiExperiment(Experiment):
                     print('Test class number: {}'.format(class_num + 1))
 
                 # Perform model comparison with test data class.
-                self.execute(data, (rows, cols), target=target)
+                self.execute(data, (rows, cols), target)
 
                 # NOTE: Num wins counter is continued for each run.
-                self._tracker.update_stats(self.results)
+                #self._tracker.update_stats(self.results)
 
         return self
+
+
+if __name__ == '__main__':
+
+    import testsets
+    import algorithms
+
+    from sklearn.cluster import SpectralBiclustering
+    from sklearn.cluster import SpectralCoclustering
+
+    data_feats = pd.read_csv(
+        './../data/data_ids/data_characteristics.csv', sep='\t', index_col=0
+    )
+
+    array_size = (1000, 100)
+    var_num_clusters = [2, 6]
+    cluster_exp_data = [
+        testsets.gen_test_sets(
+            data_feats, sparse=[False, True, False, True],
+            non_neg=[False, True, False, True],
+            shape=array_size, n_clusters=n_clusters, seed=0
+        )
+        for n_clusters in var_num_clusters
+    ]
+
+    sk_models_and_params = [
+        (
+            SpectralBiclustering, {
+                'n_clusters': var_num_clusters,
+                'method': ['log', 'bistochastic'],
+                'n_components': [6, 9, 12],
+                'n_best': [3, 6]
+            }
+        ),
+        (
+            SpectralCoclustering, {}
+        )
+    ]
+
+    me = MultiExperiment(sk_models_and_params, n_clusters=var_num_clusters)
+    me.execute_all(cluster_exp_data, data_feats.index)
