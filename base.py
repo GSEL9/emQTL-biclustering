@@ -40,12 +40,12 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
     FUNCTION = 'biclust'
 
     # Limits to bicluster size
-    MIN_ROWS = 1
-    MIN_COLS = 1
+    MIN_ROWS = 2
+    MIN_COLS = 2
 
     def __init__(self, random_state=0, **kwargs):
 
-        robjects.r('set.seed({})'.format(random_state))
+        self.random_state = random_state
 
         # Update parameters.
         for key in kwargs:
@@ -68,6 +68,10 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
             # Add underscore instead of dot to attribute
             _key = key.replace('.', '_')
             setattr(self, _key, kwargs.get(_key, value))
+
+        robjects.r('set.seed({})'.format(self.random_state))
+
+        return self
 
     def get_params(self, deep=False):
 
