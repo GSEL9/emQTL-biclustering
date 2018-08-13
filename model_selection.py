@@ -105,12 +105,10 @@ class Experiment:
 
     """
 
-    def __init__(self, grid, n_clusters=None, random_state=None, verbose=1):
+    def __init__(self, grid, verbose):
 
         self.grid = grid
-        self.n_clusters = n_clusters
         self.verbose = verbose
-        self.random_state = random_state
 
         # NOTE: Necessary to scale data to avoid sklearn inf/NaN error.
         self.scaler = StandardScaler()
@@ -124,17 +122,14 @@ class Experiment:
         self._data = None
         self._rows = None
         self._cols = None
-        self._n_clusters = None
 
-    def execute(self, data, indicators, target='score'):
+    def execute(self, data, rows, cols, random_state):
         """Performs model comparison for each class of test data."""
-
-        rows, cols = indicators
 
         if self.verbose > 0:
             print('Experiment initiated:\n{}'.format('-' * 21))
 
-        self.results, self.grids = {}, []
+        self.results = {}
         for num, key in enumerate(data.keys()):
 
             if self.verbose > 0:
@@ -145,7 +140,7 @@ class Experiment:
 
             # Winning model, hest hparams, best score
             self.results[key] = self.compare_models(
-                target=target, n_clusters=self._rows.shape[0]
+                random_state=random_state, n_clusters=self._rows.shape[0]
             )
             if self.verbose > 0:
                 name, _, score = self.results[key]
@@ -153,24 +148,20 @@ class Experiment:
 
         return self
 
-    def compare_models(self, target, n_clusters):
+    def compare_models(self, random_state, n_clusters):
         """Compare the model performance with respect to a score metric."""
 
         _train, self.row_idx, self.col_idx = sgen._shuffle(
-            self._data, random_state=self.random_state
+            self._data, random_state=random_state
         )
         _train_std = self.scaler.fit_transform(_train)
 
         winning_model, best_params, best_score = None, None, -np.float('inf')
-        for model, param_grid in self.grid:
-
+        for model, params in self.grid:
             # Determine the best hyperparameter combo for that model
             _grid = GridSearchCV(
-                model(
-                    random_state=self.random_state, n_clusters=n_clusters
-                ),
-                param_grid,
-                scoring=self.jaccard, cv=self.dummy_cv,
+                model(random_state=random_state, n_clusters=n_clusters),
+                params, scoring=self.jaccard, cv=self.dummy_cv,
                 return_train_score=True, refit=False
             )
             _grid.fit(_train_std, y=None)
@@ -185,6 +176,7 @@ class Experiment:
                 winner_model = model(**_grid.best_params_)
 
         return (winner_name, winner_model, best_score)
+
 
     def jaccard(self, estimator, train=None):
         """Computes the Jaccard coefficient as a measure of similarity between
@@ -213,9 +205,12 @@ class Experiment:
 
 class MultiExperiment(Experiment):
 
-    def __init__(self, grid, n_clusters=None, random_state=None, verbose=1):
+    # NOTE: Inferes num clusters from shape of test data.
+    def __init__(self, grid, random_states, verbose=1):
 
-        super().__init__(grid, n_clusters, random_state, verbose)
+        super().__init__(grid, verbose)
+
+        self.random_states = random_states
 
         # NOTE:
         self._tracker = None
@@ -261,26 +256,72 @@ class MultiExperiment(Experiment):
 
         return [model.__name__ for model, _ in self.grid]
 
-    def execute_all(self, dataset, test_classes, nruns=1, target='score'):
+    def execute_all(self, dataset, test_classes, nruns=1):
 
         self._tracker = PerformanceTracker(
             test_classes, self.model_labels
         )
-        for run_num in range(nruns):
+        for random_state in self.random_states:
 
             if self.verbose > 0:
-                print('Experiment parallel number: {}'.format(run_num + 1))
+                print('Experiment seed: {}'.format(random_state))
 
             # Perform single experiment with dataset.
             for class_num, (data, rows, cols) in enumerate(dataset):
 
                 if self.verbose > 0:
-                    print('Test class number: {}'.format(class_num + 1))
+                    print('Test set number: {}'.format(class_num + 1))
 
                 # Perform model comparison with test data class.
-                self.execute(data, (rows, cols), target)
+                self.execute(data, rows, cols, random_state)
 
                 # NOTE: Num wins counter is continued for each run.
                 self._tracker.update_stats(self.results)
 
         return self
+
+
+if __name__ == '__main__':
+    import numpy as np
+    import pandas as pd
+
+    import testsets
+    import algorithms
+
+    from sklearn.cluster import SpectralBiclustering
+    from sklearn.cluster import SpectralCoclustering
+
+    data_feats = pd.read_csv(
+        './../data/data_ids/data_characteristics.csv', sep='\t', index_col=0
+    )
+
+    array_size = (1000, 100)
+    var_num_clusters = [2, 4, 8]
+
+    cluster_exp_data = [
+        testsets.gen_test_sets(
+            data_feats, sparse=[False, True, False, True],
+            non_neg=[False, True, False, True],
+            shape=array_size, n_clusters=n_clusters, seed=0
+        )
+        for n_clusters in var_num_clusters
+    ]
+
+    r_models_and_params = [
+        (
+            algorithms.Plaid, {
+                'background': [True],
+            }
+        ), (
+            algorithms.XMotifs, {
+                'nd': [100],
+            }
+        )
+    ]
+
+    me = MultiExperiment(
+        grid=r_models_and_params,
+        random_states=[0, 9],
+    )
+    me.execute_all(cluster_exp_data, data_feats.index)
+    print(me.performance_report)
