@@ -175,6 +175,7 @@ class Experiment:
                 winner_name = model.__name__
                 winner_model = model(**_grid.best_params_)
 
+        # NOTE: Model returned is not fitted.
         return (winner_name, winner_model, best_score)
 
 
@@ -256,7 +257,7 @@ class MultiExperiment(Experiment):
 
         return [model.__name__ for model, _ in self.grid]
 
-    def execute_all(self, dataset, test_classes, nruns=1):
+    def execute_all(self, dataset, test_classes):
 
         self._tracker = PerformanceTracker(
             test_classes, self.model_labels
