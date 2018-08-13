@@ -281,47 +281,6 @@ class MultiExperiment(Experiment):
                 self.execute(data, (rows, cols), target)
 
                 # NOTE: Num wins counter is continued for each run.
-                #self._tracker.update_stats(self.results)
+                self._tracker.update_stats(self.results)
 
         return self
-
-
-if __name__ == '__main__':
-
-    import testsets
-    import algorithms
-
-    from sklearn.cluster import SpectralBiclustering
-    from sklearn.cluster import SpectralCoclustering
-
-    data_feats = pd.read_csv(
-        './../data/data_ids/data_characteristics.csv', sep='\t', index_col=0
-    )
-
-    array_size = (1000, 100)
-    var_num_clusters = [2, 6]
-    cluster_exp_data = [
-        testsets.gen_test_sets(
-            data_feats, sparse=[False, True, False, True],
-            non_neg=[False, True, False, True],
-            shape=array_size, n_clusters=n_clusters, seed=0
-        )
-        for n_clusters in var_num_clusters
-    ]
-
-    sk_models_and_params = [
-        (
-            SpectralBiclustering, {
-                'n_clusters': var_num_clusters,
-                'method': ['log', 'bistochastic'],
-                'n_components': [6, 9, 12],
-                'n_best': [3, 6]
-            }
-        ),
-        (
-            SpectralCoclustering, {}
-        )
-    ]
-
-    me = MultiExperiment(sk_models_and_params, n_clusters=var_num_clusters)
-    me.execute_all(cluster_exp_data, data_feats.index)

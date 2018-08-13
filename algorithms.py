@@ -157,11 +157,3 @@ class Plaid(RBiclusterBase):
         self._fit(self.MODEL, X, self.params)
 
         return self
-
-
-if __name__ == '__main__':
-
-    plaid = Plaid(random_state=0)
-    print(plaid.random_state)
-    plaid.random_state = 1
-    print(plaid.random_state)
