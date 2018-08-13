@@ -219,6 +219,43 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
 
         return _row_mat, _col_mat
 
+    # ERROR:
+    def r_heatmap(data, row_mat, col_mat, palette=None, **kwargs):
+
+        nrows, ncols = data.shape
+
+        kwargs['bicResult'] = self._r_biclust(row_mat, col_mat)
+        kwargs['number'] = 1
+
+        if palette is not None:
+            kwargs["beamercolor"] = True
+            kwargs["paleta"] = palette
+
+        dkwargs = dict()
+        for key in ('file', 'width', 'height'):
+            if key in kwargs:
+                dkwargs[key] = kwargs.pop(key)
+
+        r.r.library('biclust')
+        func = r.r['drawHeatmap']
+
+        func(*args, **kwargs)
+
+    # ERROR:
+    def _r_biclust(self, row_mat, col_mat):
+        # Return instances of the R Biclust class.
+
+        r.r.library('biclust')
+        classfunc = r.r['BiclustResult']
+
+        num_x_col = col_mat.T
+        n_clusters = len(biclusters)
+
+        empty_list = r.r('list()'')
+        params, info = empty_list, empty_list
+
+        return classfunc(empty_list, row_mat, num_x_col, n_clusters, info)
+
 
 class BinaryBiclusteringBase:
     """
