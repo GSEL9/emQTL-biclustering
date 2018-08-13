@@ -33,9 +33,12 @@ class ChengChurch(RBiclusterBase):
         'number': 10
     }
 
-    def __init__(self, random_state=0, **kwargs):
+    def __init__(self, random_state=0, n_clusters=None, **kwargs):
 
         super().__init__(random_state, **kwargs)
+
+        # NOTE: Hack to allow sklearn API in specifying number of clusters.
+        self.params['numbers'] = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -76,9 +79,12 @@ class XMotifs(RBiclusterBase):
         'alpha': 0.05
     }
 
-    def __init__(self, random_state=0, **kwargs):
+    def __init__(self, random_state=None, n_clusters=None, **kwargs):
 
         super().__init__(random_state, **kwargs)
+
+        # NOTE: Hack to allow sklearn API in specifying number of clusters.
+        self.params['numbers'] = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -126,9 +132,11 @@ class Plaid(RBiclusterBase):
         'verbose': False,
     }
 
-    def __init__(self, random_state=0, **kwargs):
+    def __init__(self, random_state=0, n_clusters=None, **kwargs):
 
         super().__init__(random_state, **kwargs)
+
+        # NOTE: n_clusters param is ignored.
 
         # Update parameters.
         for key in kwargs:
@@ -149,3 +157,11 @@ class Plaid(RBiclusterBase):
         self._fit(self.MODEL, X, self.params)
 
         return self
+
+
+if __name__ == '__main__':
+
+    plaid = Plaid(random_state=0)
+    print(plaid.random_state)
+    plaid.random_state = 1
+    print(plaid.random_state)
