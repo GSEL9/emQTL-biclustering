@@ -38,7 +38,7 @@ class ChengChurch(RBiclusterBase):
         super().__init__(random_state, **kwargs)
 
         # NOTE: Hack to allow sklearn API in specifying number of clusters.
-        self.params['numbers'] = n_clusters
+        self.params['number'] = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -84,7 +84,7 @@ class XMotifs(RBiclusterBase):
         super().__init__(random_state, **kwargs)
 
         # NOTE: Hack to allow sklearn API in specifying number of clusters.
-        self.params['numbers'] = n_clusters
+        self.params['number'] = n_clusters
 
         # Update parameters.
         for key in kwargs:
