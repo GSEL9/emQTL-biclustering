@@ -33,9 +33,9 @@ class ChengChurch(RBiclusterBase):
         'number': 10
     }
 
-    def __init__(self, random_state=0, n_clusters=None, **kwargs):
+    def __init__(self, random_state=0, n_clusters=1, **kwargs):
 
-        super().__init__(random_state, **kwargs)
+        super().__init__(random_state=random_state, **kwargs)
 
         # NOTE: Hack to allow sklearn API in specifying number of clusters.
         self.params['number'] = n_clusters
@@ -79,9 +79,9 @@ class XMotifs(RBiclusterBase):
         'alpha': 0.05
     }
 
-    def __init__(self, random_state=None, n_clusters=None, **kwargs):
+    def __init__(self, random_state=0, n_clusters=1, **kwargs):
 
-        super().__init__(random_state, **kwargs)
+        super().__init__(random_state=random_state, **kwargs)
 
         # NOTE: Hack to allow sklearn API in specifying number of clusters.
         self.params['number'] = n_clusters
@@ -132,9 +132,9 @@ class Plaid(RBiclusterBase):
         'verbose': False,
     }
 
-    def __init__(self, random_state=0, n_clusters=None, **kwargs):
+    def __init__(self, random_state=0, n_clusters=1, **kwargs):
 
-        super().__init__(random_state, **kwargs)
+        super().__init__(random_state=random_state, **kwargs)
 
         # NOTE: n_clusters param is ignored.
 
