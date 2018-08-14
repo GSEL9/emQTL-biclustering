@@ -138,7 +138,7 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
         self.rows_, self.columns_ = self.fetch_biclusters(X)
 
         # Assign to attribute.
-        self.biclusters_ = (self.rows_, self.columns_)
+        #self.biclusters_ = (self.rows_, self.columns_)
 
         return self
 
@@ -151,6 +151,7 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
 
         # Import function from R library.
         robjects.r.library(self.FUNCTION)
+
         # Function instance.
         function = robjects.r[self.FUNCTION]
 
@@ -171,7 +172,7 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
         col_mat_raw = np.array(self._output.do_slot('NumberxCol'), dtype=bool)
 
         # NOTE: Necessary to format biclusters before filtereing in case
-        # wrong shape (missleading in )
+        # wrong shape (missleading in filtering)
         row_mat_form, col_mat_form = self.format_biclusters(
             row_mat_raw, col_mat_raw, X
         )
@@ -221,136 +222,63 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
         return _row_mat, _col_mat
 
 
+class Bicluster:
+    """Utility representation of a bicluster."""
+
+    def __init__(self, rows, cols, data):
+
+        self.rows = rows
+        self.cols = cols
+        self.data = data
+
+        self.setup()
+
+        # NOTE: Attributes set with instance.
+        self.nbiclusters = None
+        self.nrows = None
+        self.ncols = None
+
+    def setup(self):
+
+        sample, ref = np.shape(self.rows)[0], np.shape(self.cols)[0]
+        if not sample == ref:
+            raise RuntimeError('Sample clusters: {}, ref clusters {}'
+                               ''.format(sample, ref))
+        self.nbiclusters = sample
+
+        self.nrows, self.ncols = np.shape(self.data)
+
+        return self
+
+    def bools(self):
+
+        pass
+
+    @property
+    def indicators(self):
+        """Determine coordiantes of row and column indicators
+        for each bicluster.
+        """
+
+        row_idx, col_idx = [], []
+        for cluster_num in range(self.nbiclusters):
+
+            rows_bools = self.rows[cluster_num, :] != 0
+            cols_bools = self.cols[cluster_num, :] != 0
+
+            rows = [index for index, elt in enumerate(rows_bools) if elt]
+            cols = [index for index, elt in enumerate(cols_bools) if elt]
+
+            row_idx.append(rows), col_idx.append(cols)
+
+        return row_idx, col_idx
+
+    @property
+    def cluster_stats(self):
+
+        pass
+
+
 if __name__ == '__main__':
 
-    import numpy as np
-    from matplotlib import pyplot as plt
-
-    from sklearn.datasets import make_checkerboard
-    from sklearn.datasets import samples_generator as sg
-    from sklearn.cluster.bicluster import SpectralBiclustering
-
-    import rpy2.robjects as r
-    import rpy2.robjects.numpy2ri
-    rpy2.robjects.numpy2ri.activate()
-
-    n_clusters = (4, 3)
-    data, rows, columns = make_checkerboard(
-        shape=(300, 300), n_clusters=n_clusters, noise=10,
-        shuffle=False, random_state=0)
-
-    data, row_idx, col_idx = sg._shuffle(data, random_state=0)
-
-    model = SpectralBiclustering(
-        n_clusters=n_clusters, method='log', random_state=0)
-    model.fit(data)
-
-    row_mat, col_mat = model.rows_, model.columns_
-    num_biclusters = row_mat.shape[0]
-
-    row_idx, col_idx = [], []
-    #biclusters = []
-    for cluster_num in range(num_biclusters):
-
-        rows_bools = row_mat[cluster_num, :] != 0
-        cols_bools = col_mat[cluster_num, :] != 0
-
-        rows = [index for index, elt in enumerate(rows_bools) if elt]
-        cols = [index for index, elt in enumerate(cols_bools) if elt]
-
-        row_idx.append(rows), col_idx.append(cols)
-        #biclusters.append((rows, cols))
-
-
-
-
-
-    def get_row_col_matrices(biclusters, data):
-        # row x number and col x number matrices for the given
-        # set of biclusters.
-
-        nrows, ncols = np.shape(data)
-        nbiclusters = len(biclusters)
-
-        RowXNumber = np.zeros((nrows, nbiclusters), dtype=np.bool8)
-        ColXNumber = np.zeros((ncols, nbiclusters), dtype=np.bool8)
-
-        for bindex, (rows, cols) in enumerate(biclusters):
-            for r in rows:
-                RowXNumber[r, bindex] = True
-            for c in cols:
-                ColXNumber[c, bindex] = True
-
-        return RowXNumber, ColXNumber
-
-
-    def _get_r_biclust(biclusters, data):
-
-        r.r.library('biclust')
-        classfunc = r.r['BiclustResult']
-
-        # NOTE: Equiv to sampling row and col mats only?
-        RowxNumber, ColxNumber = get_row_col_matrices(biclusters, data)
-        NumberxCol = ColxNumber.T
-        number = len(biclusters)
-
-        empty_list = r.r('list()')
-        params = empty_list
-        info = empty_list
-
-        return classfunc(empty_list, RowxNumber, NumberxCol, number, info)
-
-
-    def _rplot(func, *args, **kwargs):
-
-        r.r.library('biclust')
-        func = r.r[func]
-
-        dkwargs = dict()
-        for key in ('file', 'width', 'height'):
-            if key in kwargs:
-                dkwargs[key] = kwargs.pop(key)
-
-        func(*args, **kwargs)
-
-
-    """
-    kwargs = {
-        'data': data,
-        'bicluster': np.array(biclusters, dtype=float),
-        'local': False,
-        'bicResult': _get_r_biclust(biclusters, data),
-        'plotAll': True,
-        'file': './../../r_heatmap.png'
-    }
-
-    _rplot('drawHeatmap', r.Matrix(data), **kwargs)
-    """
-    import algorithms
-
-    model = algorithms.Plaid()#ChengChurch()
-    model.fit(data)
-
-    print(model._output)
-
-    #r.r.library('biclust')
-    #func = r.r['BiclustResult']
-    #dummy_list = r.r('list()')
-    #bicResult = func(
-    #    dummy_list, row_idx, np.transpose(col_idx), len(row_idx)
-    #)
-    #r.r.png(file='./../../r_heatmap2.png')
-    #r.r.heatmapBC(r.Matrix(data), bicResult=bicResult, number=0)
-
-
-    #, xlab=row_idx, ylab=col_idx,
-          #labRow=False, labCol=False,
-          #main="Without xy names")
-
-    #r.r.drawHeatmap(data, model._output, 1)
-
-    #R = ro.r
-    #data = np.random.random((10, 10))
-    #R.png(file='./../../r_heatmap.png')
-    #R.drawHeatmap(data)#, bicResult=NULL, number=NA, plotAll=FALSE)
-    #R("dev.off()")
+    pass
