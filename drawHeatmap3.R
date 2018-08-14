@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+#
+# drawHeatmap3.R
+#
+
+
 drawHeatmap3 = function (x, bicResult=NULL) {
   # The function builds on refactoring and modification of the R biclust
   # package drawHeatmap2 function.
