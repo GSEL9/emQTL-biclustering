@@ -16,63 +16,6 @@ import ast
 import numpy as np
 
 
-class Bicluster:
-    """Utility representation of a bicluster."""
-
-    def __init__(self, rows, cols, data):
-
-        self.rows = rows
-        self.cols = cols
-        self.data = data
-
-        self.setup()
-
-        # NOTE: Attributes set with instance.
-        self.nbiclusters = None
-        self.nrows = None
-        self.ncols = None
-
-    def setup(self):
-
-        sample, ref = np.shape(self.rows)[0], np.shape(self.cols)[0]
-        if not sample == ref:
-            raise RuntimeError('Sample clusters: {}, ref clusters {}'
-                               ''.format(sample, ref))
-        self.nbiclusters = sample
-
-        self.nrows, self.ncols = np.shape(self.data)
-
-        return self
-
-    def bools(self):
-
-        pass
-
-    @property
-    def indicators(self):
-        """Determine coordiantes of row and column indicators
-        for each bicluster.
-        """
-
-        row_idx, col_idx = [], []
-        for cluster_num in range(self.nbiclusters):
-
-            rows_bools = self.rows[cluster_num, :] != 0
-            cols_bools = self.cols[cluster_num, :] != 0
-
-            rows = [index for index, elt in enumerate(rows_bools) if elt]
-            cols = [index for index, elt in enumerate(cols_bools) if elt]
-
-            row_idx.append(rows), col_idx.append(cols)
-
-        return row_idx, col_idx
-
-    @property
-    def cluster_stats(self):
-
-        pass
-
-
 class ReferenceMatching:
 
     @classmethod

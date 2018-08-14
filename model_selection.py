@@ -14,6 +14,7 @@ __author__ = 'Severin E. R. Langberg'
 __email__ = 'Langberg91@gmail.no'
 
 
+import ast
 import operator
 
 import numpy as np
@@ -280,49 +281,3 @@ class MultiExperiment(Experiment):
                 self._tracker.update_stats(self.results)
 
         return self
-
-
-if __name__ == '__main__':
-    import numpy as np
-    import pandas as pd
-
-    import testsets
-    import algorithms
-
-    from sklearn.cluster import SpectralBiclustering
-    from sklearn.cluster import SpectralCoclustering
-
-    data_feats = pd.read_csv(
-        './../data/data_ids/data_characteristics.csv', sep='\t', index_col=0
-    )
-
-    array_size = (1000, 100)
-    var_num_clusters = [2, 4, 8]
-
-    cluster_exp_data = [
-        testsets.gen_test_sets(
-            data_feats, sparse=[False, True, False, True],
-            non_neg=[False, True, False, True],
-            shape=array_size, n_clusters=n_clusters, seed=0
-        )
-        for n_clusters in var_num_clusters
-    ]
-
-    r_models_and_params = [
-        (
-            algorithms.Plaid, {
-                'background': [True],
-            }
-        ), (
-            algorithms.XMotifs, {
-                'nd': [100],
-            }
-        )
-    ]
-
-    me = MultiExperiment(
-        grid=r_models_and_params,
-        random_states=[0, 9],
-    )
-    me.execute_all(cluster_exp_data, data_feats.index)
-    print(me.performance_report)
