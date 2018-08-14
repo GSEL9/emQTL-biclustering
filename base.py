@@ -55,6 +55,7 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
         self.set_params(**kwargs)
 
         # NOTE:
+        self._r = None
         self._output = None
 
         self.rows_ = None
@@ -219,135 +220,137 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
 
         return _row_mat, _col_mat
 
-    # ERROR:
-    def r_heatmap(data, row_mat, col_mat, palette=None, **kwargs):
 
-        nrows, ncols = data.shape
+if __name__ == '__main__':
 
-        kwargs['bicResult'] = self._r_biclust(row_mat, col_mat)
-        kwargs['number'] = 1
+    import numpy as np
+    from matplotlib import pyplot as plt
 
-        if palette is not None:
-            kwargs["beamercolor"] = True
-            kwargs["paleta"] = palette
+    from sklearn.datasets import make_checkerboard
+    from sklearn.datasets import samples_generator as sg
+    from sklearn.cluster.bicluster import SpectralBiclustering
+
+    import rpy2.robjects as r
+    import rpy2.robjects.numpy2ri
+    rpy2.robjects.numpy2ri.activate()
+
+    n_clusters = (4, 3)
+    data, rows, columns = make_checkerboard(
+        shape=(300, 300), n_clusters=n_clusters, noise=10,
+        shuffle=False, random_state=0)
+
+    data, row_idx, col_idx = sg._shuffle(data, random_state=0)
+
+    model = SpectralBiclustering(
+        n_clusters=n_clusters, method='log', random_state=0)
+    model.fit(data)
+
+    row_mat, col_mat = model.rows_, model.columns_
+    num_biclusters = row_mat.shape[0]
+
+    row_idx, col_idx = [], []
+    #biclusters = []
+    for cluster_num in range(num_biclusters):
+
+        rows_bools = row_mat[cluster_num, :] != 0
+        cols_bools = col_mat[cluster_num, :] != 0
+
+        rows = [index for index, elt in enumerate(rows_bools) if elt]
+        cols = [index for index, elt in enumerate(cols_bools) if elt]
+
+        row_idx.append(rows), col_idx.append(cols)
+        #biclusters.append((rows, cols))
+
+
+
+
+
+    def get_row_col_matrices(biclusters, data):
+        # row x number and col x number matrices for the given
+        # set of biclusters.
+
+        nrows, ncols = np.shape(data)
+        nbiclusters = len(biclusters)
+
+        RowXNumber = np.zeros((nrows, nbiclusters), dtype=np.bool8)
+        ColXNumber = np.zeros((ncols, nbiclusters), dtype=np.bool8)
+
+        for bindex, (rows, cols) in enumerate(biclusters):
+            for r in rows:
+                RowXNumber[r, bindex] = True
+            for c in cols:
+                ColXNumber[c, bindex] = True
+
+        return RowXNumber, ColXNumber
+
+
+    def _get_r_biclust(biclusters, data):
+
+        r.r.library('biclust')
+        classfunc = r.r['BiclustResult']
+
+        # NOTE: Equiv to sampling row and col mats only?
+        RowxNumber, ColxNumber = get_row_col_matrices(biclusters, data)
+        NumberxCol = ColxNumber.T
+        number = len(biclusters)
+
+        empty_list = r.r('list()')
+        params = empty_list
+        info = empty_list
+
+        return classfunc(empty_list, RowxNumber, NumberxCol, number, info)
+
+
+    def _rplot(func, *args, **kwargs):
+
+        r.r.library('biclust')
+        func = r.r[func]
 
         dkwargs = dict()
         for key in ('file', 'width', 'height'):
             if key in kwargs:
                 dkwargs[key] = kwargs.pop(key)
 
-        r.r.library('biclust')
-        func = r.r['drawHeatmap']
-
         func(*args, **kwargs)
 
-    # ERROR:
-    def _r_biclust(self, row_mat, col_mat):
-        # Return instances of the R Biclust class.
-
-        r.r.library('biclust')
-        classfunc = r.r['BiclustResult']
-
-        num_x_col = col_mat.T
-        n_clusters = len(biclusters)
-
-        empty_list = r.r('list()'')
-        params, info = empty_list, empty_list
-
-        return classfunc(empty_list, row_mat, num_x_col, n_clusters, info)
-
-
-class BinaryBiclusteringBase:
-    """
-
-    Attribtues:
-        binary ():
-        temp_dir ():
 
     """
+    kwargs = {
+        'data': data,
+        'bicluster': np.array(biclusters, dtype=float),
+        'local': False,
+        'bicResult': _get_r_biclust(biclusters, data),
+        'plotAll': True,
+        'file': './../../r_heatmap.png'
+    }
 
-    INPUT_FILE = 'input'
+    _rplot('drawHeatmap', r.Matrix(data), **kwargs)
+    """
+    import algorithms
 
-    def __init__(self, model, file_format='txt', temp=False):
+    model = algorithms.Plaid()#ChengChurch()
+    model.fit(data)
 
-        self.model = model#self.check_on_path(model)
-        self.file_format = file_format
-        self.temp = temp
+    print(model._output)
 
-        # NOTE: Variables set with instance.
-        self.path_dir = None
-        self.path_data = None
+    #r.r.library('biclust')
+    #func = r.r['BiclustResult']
+    #dummy_list = r.r('list()')
+    #bicResult = func(
+    #    dummy_list, row_idx, np.transpose(col_idx), len(row_idx)
+    #)
+    #r.r.png(file='./../../r_heatmap2.png')
+    #r.r.heatmapBC(r.Matrix(data), bicResult=bicResult, number=0)
 
-    # ERROR: Something mysterious goingin on
-    @staticmethod
-    def check_on_path(model, path_var='PATH'):
-        """Check if an executable is included in $PATH environment variable."""
 
-        def _is_exec(fpath):
-            #
+    #, xlab=row_idx, ylab=col_idx,
+          #labRow=False, labCol=False,
+          #main="Without xy names")
 
-            return os.path.exists(fpath) and os.access(fpath, os.X_OK)
+    #r.r.drawHeatmap(data, model._output, 1)
 
-        def _path_error(model):
-            # Raises path error if executable not found on path.
-
-            raise PathError('Executable {0} not on $PATH'.format(model))
-
-        fpath, fname = os.path.split(model)
-        if fpath:
-            if _is_exec(model):
-                return model
-        else:
-            for path in os.environ[path_var].split(os.pathsep):
-                exe_file = os.path.join(path, model)
-                if _is_exec(exe_file):
-                    return model
-
-    @property
-    def path_dir(self):
-
-        return self._path_dir
-
-    @path_dir.setter
-    def path_dir(self, value):
-
-        self._path_dir = value
-
-    @property
-    def path_data(self):
-
-        return self._path_data
-
-    @path_data.setter
-    def path_data(self, value):
-
-        if value is None:
-            return
-        else:
-            if isinstance(value, str):
-                self._path_data = value
-            else:
-                raise ValueError('file path should be <str>, not {}'
-                                 ''.format(type(value)))
-
-    def setup_io(self):
-        """Create dir holding formatted input data and raw output data."""
-
-        if self.temp:
-            self.path_dir = tempfile.mkdtemp()
-        else:
-            current_loc = os.getcwd()
-            dir_name = '{0}_data'.format(self.model)
-
-            self.path_dir = os.path.join(current_loc, dir_name)
-            if not os.path.exists(self.path_dir):
-                os.makedirs(self.path_dir)
-
-        self.path_data = os.path.join(
-            self.path_dir, '{0}.{1}'.format(self.INPUT_FILE, self.file_format)
-        )
-
-    def io_teardown_temp(self):
-
-        # Cleanup temporary directory
-        shutil.rmtree(self.path_dir)
+    #R = ro.r
+    #data = np.random.random((10, 10))
+    #R.png(file='./../../r_heatmap.png')
+    #R.drawHeatmap(data)#, bicResult=NULL, number=NA, plotAll=FALSE)
+    #R("dev.off()")
