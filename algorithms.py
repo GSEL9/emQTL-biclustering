@@ -30,7 +30,7 @@ class ChengChurch(RBiclusterBase):
     params = {
         'delta': 0.1,
         'alpha': 1.5,
-        'number': 10
+        'number': 2
     }
 
     def __init__(self, random_state=0, n_clusters=1, **kwargs):
@@ -72,7 +72,7 @@ class XMotifs(RBiclusterBase):
 
     # Hyperparameters
     params = {
-        'number': 10,
+        'number': 2,
         'ns': 200,
         'nd': 100,
         'sd': 5,
