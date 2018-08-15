@@ -4,7 +4,7 @@
 #
 
 
-drawHeatmap3 = function (x, bicResult=NULL) {
+drawHeatmap3 = function(x, bicResult=NULL) {
   # The function builds on refactoring and modification of the R biclust
   # package drawHeatmap2 function.
 
@@ -53,16 +53,16 @@ drawHeatmap3 = function (x, bicResult=NULL) {
 
   desp = (nrows - rowlength[1]) / nrows
   grid.lines(
-    x = unit(c(0, 1), 'npc'),
+    x=unit(c(0, 1), 'npc'),
     y=unit(c(desp, desp), 'npc'),
-    gp=gpar(col = 'yellow')
+    gp=gpar(col='yellow')
   )
 
   desp = (collength[1]) / ncols
   grid.lines(
     y=unit(c(0, 1), 'npc'),
     x=unit(c(desp, desp), 'npc'),
-    gp=gpar(col = 'yellow')
+    gp=gpar(col='yellow')
   )
   for (i in 2:bicResult@Number) {
      desp = (nrows - rowlength[i]) / nrows
@@ -75,7 +75,7 @@ drawHeatmap3 = function (x, bicResult=NULL) {
      grid.lines(
        y=unit(c(0, 1), 'npc'),
        x=unit(c(desp, desp), 'npc'),
-       gp=gpar(col = 'yellow')
+       gp=gpar(col='yellow')
      )
   }
   par(mai = oldmai, mar = oldmar)
