@@ -163,8 +163,11 @@ class Experiment:
             # Determine the best hyperparameter combo for that model
             _grid = GridSearchCV(
                 model(random_state=random_state, n_clusters=n_clusters),
-                params, scoring=self.jaccard, cv=self.dummy_cv,
-                return_train_score=True, refit=False
+                params,
+                scoring=self.jaccard,
+                cv=self.dummy_cv,
+                return_train_score=True,
+                refit=False
             )
             _grid.fit(_train_std, y=None)
 
