@@ -9,6 +9,8 @@
 
 library('biclust')
 
+set.seed(1234)
+
 print('Loading data...')
 
 # Read data into memory.
@@ -37,7 +39,8 @@ grapher <- dget('drawHeatmap3.R')
 print('Generating graphics...')
 
 png(figure_name)
-grapher(mat, bicResult=model)
+heatmapBC(mat, bicResult=model, verbose=F)
+#grapher(mat, bicResult=model)
 dev.off()
 
 print('Graphics complete')
