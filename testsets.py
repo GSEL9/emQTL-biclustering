@@ -106,11 +106,11 @@ def percentile_filter(data, feats):
     # Determines the fraction of nonzero values in the data.
     sparsity_frac = feats['nonzeros'] / (feats['nrows'] * feats['ncols'])
 
-    # Determine the threshold valeu from the sprasity fraction percentile.
-    thresh = np.percentile(data.ravel(), q=100 * (1 - sparsity_frac))
+    # NOTE: Added convenience term 0.1 for more suitable test data.
+    thresh = np.percentile(data.ravel(), q=100 * (1 - (sparsity_frac + 0.05)))
 
     # Replace p-values below threshold with zero.
-    data[data < thresh] = 0
+    data[(data > 0) & (data < thresh)] = 0
 
     return data
 
@@ -120,18 +120,41 @@ if __name__ == '__main__':
     import numpy as np
     import pandas as pd
 
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
     from sklearn.datasets import samples_generator as sgen
 
     # Characteristics samples from experimental data
     data_feats = pd.read_csv(
-        './../data/data_characteristics.csv', sep='\t', index_col=0
+        './../data/data_ids/data_characteristics.csv',
+        sep='\t', index_col=0
     )
     # NOTE: Every other dataset is sparse and the oposite sets contains negative values
-    test_data, rows, cols = gen_test_sets(
-        data_feats,
-        sparse=[False, True, False, True],
-        non_neg=[False, True, False, True],
-        shape=(500, 300),
-        n_clusters=5,
-        seed=0
+    sample_data, _, _ = gen_test_sets(
+        data_feats, sparse=[False, True, False, True],
+        non_neg=[True, False, True, False],
+        shape=(500, 300), n_clusters=4, seed=0
     )
+
+    nrows, ncols = 2, 2
+    labels = list(sample_data.keys())
+
+    fig, axes = plt.subplots(
+        ncols=ncols, nrows=nrows, figsize=(12, 10), sharey=True, sharex=True
+    )
+    num = 0
+    for row in range(nrows):
+        for col in range(ncols):
+            _data = sample_data[labels[num]]
+            sns.heatmap(
+                _data, ax=axes[row, col], cbar=True,
+                vmin=np.min(_data), vmax=np.max(_data)
+            )
+            axes[row, col].set_title(labels[num])
+            axes[row, col].axis('off')
+
+            num += 1
+
+    plt.tight_layout()
+    plt.show()
