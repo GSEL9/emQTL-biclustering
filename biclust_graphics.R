@@ -9,24 +9,35 @@
 
 library('biclust')
 
+print('Loading data...')
 
 # Read data into memory.
-data <- read.csv(file='./../data/train/sel_pvalues_prep.csv', sep=',')
+frame <- read.csv(file='./../data/train/sel_pvalues_prep.csv', sep=',')
 #frame <- read.csv(file='./dummy.csv', sep=',')
-x = data.matrix(frame)
+mat = data.matrix(frame)
+
+print('Loading data complete')
 
 # Setup.
-n_clusters = 2
-figure_name = './../dummy_hm.png'
+N_CLUSTERS = 2
+figure_name = './../predictions/imgs/r_sel_pvalues_prep.png'
+
+print('Model training...')
 
 # Perform biclustering.
 model <- biclust(
-  x, method='BCCC', delta=1.5, alpha=0.1, number=n_clusters
+  mat, method='BCCC', delta=1.5, alpha=0.1, number=N_CLUSTERS
 )
+
+print('Model training complete')
 
 # Gen graphics.
 grapher <- dget('drawHeatmap3.R')
 
+print('Generating graphics...')
+
 png(figure_name)
-grapher(x=x, bicResult=model)
+grapher(mat, bicResult=model)
 dev.off()
+
+print('Graphics complete')
