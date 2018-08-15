@@ -171,20 +171,4 @@ class Plaid(RBiclusterBase):
 
 if __name__ == '__main__':
 
-    import numpy as np
-    import pandas as pd
-
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-
-    data = np.random.random((10, 10))
-
-    model = XMotifs()
-    print(model)
-    print(model.n_clusters)
-    model.n_clusters = 2
-    print(model)
-    model.n_clusters = 9
-    print(model)
-    print(model.n_clusters)
-    #model.fit(data)
+    pass
