@@ -216,6 +216,51 @@ class Bimax(RBiclusterBase):
 
         return self
 
+
+class Quest(RBiclusterBase):
+    """A wrapper for the R biclust package BCQuest algorithm.
+
+    Searches subgroups of questionairs with same or similar
+    answer to some questions.
+
+    """
+
+    MODEL = 'BCQuest'
+
+    # Hyperparameters
+    params = {
+        'nd': 10,
+        'ns': 10,
+        'sd': 5,
+        'alpha': 0.05,
+        'number': 2,
+    }
+
+    def __init__(self, random_state=0, n_clusters=1, **kwargs):
+
+        super().__init__(random_state=random_state, **kwargs)
+
+        # Update parameters.
+        for key in kwargs:
+            if key in self.params.keys():
+                self.params[key] = kwargs[key]
+
+        self.set_params(**kwargs)
+
+        # NOTE:
+        self._output = None
+
+        self.rows_ = None
+        self.columns_ = None
+        self.biclusters_ = None
+
+    def fit(self, X, y=None, **kwargs):
+
+        self._fit(self.MODEL, X, self.params)
+
+        return self
+
+
 if __name__ == '__main__':
 
     import numpy as np
@@ -233,7 +278,7 @@ if __name__ == '__main__':
     data, row_idx, col_idx = sg._shuffle(data, random_state=0)
 
 
-    model = Bimax()
+    model = Quest()
     model.fit(data)
 
     score = consensus_score(model.biclusters_,
@@ -266,9 +311,9 @@ if __name__ == '__main__':
 
     models_and_params = [
     (
-        Bimax, {
-            'minc': [10, 20, 30],
-            'minr': [10, 20, 30]
+        Quest, {
+            'nd': [10, 20, 30],
+            'ns': [10, 20, 30]
         }
     )
     ]
