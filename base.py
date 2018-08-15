@@ -138,7 +138,7 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
         self.rows_, self.columns_ = self.fetch_biclusters(X)
 
         # Assign to attribute.
-        #self.biclusters_ = (self.rows_, self.columns_)
+        self.biclusters_ = (self.rows_, self.columns_)
 
         return self
 
