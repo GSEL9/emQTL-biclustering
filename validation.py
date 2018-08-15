@@ -205,11 +205,14 @@ class Biclusters:
             _row_cluster = self.data.values[row_idx[num], :]
             cluster = _row_cluster[:, col_idx[num]]
             if np.any(cluster):
+                cluster_size = np.size(cluster)
+
                 stats[num] = {
                     'max': np.max(cluster),
                     'min': np.min(cluster),
                     'std': np.std(cluster),
-                    'rel_size': np.size(cluster) / data_size,
+                    'size': cluster_size,
+                    'rel_size': cluster_size / data_size,
                     'zeros': int(np.count_nonzero(cluster==0))
                 }
             else:
