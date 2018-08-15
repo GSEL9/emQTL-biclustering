@@ -159,6 +159,7 @@ class Experiment:
 
         winning_model, best_params, best_score = None, None, -np.float('inf')
         for model, params in self.grid:
+
             # Determine the best hyperparameter combo for that model
             _grid = GridSearchCV(
                 model(random_state=random_state, n_clusters=n_clusters),
@@ -281,3 +282,8 @@ class MultiExperiment(Experiment):
                 self._tracker.update_stats(self.results)
 
         return self
+
+
+if __name__ == '__main__':
+
+    pass
