@@ -64,7 +64,7 @@ class ChengChurch(RBiclusterBase):
         return self
 
 
-class XMotifs(RBiclusterBase):
+class Xmotifs(RBiclusterBase):
     """A wrapper for the R BCXmotifs algorithm.
 
     Coherent  correlation  over  rows and  columns
