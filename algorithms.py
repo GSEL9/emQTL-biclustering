@@ -84,7 +84,7 @@ class XMotifs(RBiclusterBase):
         super().__init__(random_state=random_state, **kwargs)
 
         # NOTE: Hack to allow sklearn API in specifying number of clusters.
-        self.params['number'] = n_clusters
+        self.n_clusters = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -99,6 +99,16 @@ class XMotifs(RBiclusterBase):
         self.rows_ = None
         self.columns_ = None
         self.biclusters_ = None
+
+    @property
+    def n_clusters(self):
+
+        return self.params['number']
+
+    @n_clusters.setter
+    def n_clusters(self, value):
+
+        self.params['number'] = value
 
     def fit(self, X, y=None, **kwargs):
 
@@ -157,3 +167,24 @@ class Plaid(RBiclusterBase):
         self._fit(self.MODEL, X, self.params)
 
         return self
+
+
+if __name__ == '__main__':
+
+    import numpy as np
+    import pandas as pd
+
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    data = np.random.random((10, 10))
+
+    model = XMotifs()
+    print(model)
+    print(model.n_clusters)
+    model.n_clusters = 2
+    print(model)
+    model.n_clusters = 9
+    print(model)
+    print(model.n_clusters)
+    #model.fit(data)
