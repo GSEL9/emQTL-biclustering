@@ -163,7 +163,6 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
 
         return self
 
-    # NOTE: Add attr with code to extract row and col labels
     def fetch_biclusters(self, X):
         # Set rows and columns attributes.
 
@@ -171,8 +170,7 @@ class RBiclusterBase(BaseEstimator, ClusterMixin):
         row_mat_raw = np.array(self._output.do_slot('RowxNumber'), dtype=bool)
         col_mat_raw = np.array(self._output.do_slot('NumberxCol'), dtype=bool)
 
-        # NOTE: Necessary to format biclusters before filtereing in case
-        # wrong shape (missleading in filtering)
+        # NOTE: Format biclusters before filtereing because affects filtering.
         row_mat_form, col_mat_form = self.format_biclusters(
             row_mat_raw, col_mat_raw, X
         )
