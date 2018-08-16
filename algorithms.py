@@ -288,7 +288,7 @@ class Spectral(RBiclusterBase):
         'numberOfEigenvalues': 3,
         'minc': 4,
         'minr': 4,
-        'withinVar': 0.0
+        'withinVar': 5
     }
 
     def __init__(self, random_state=0, n_clusters=2, **kwargs):
