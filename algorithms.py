@@ -40,8 +40,8 @@ class ChengChurch(RBiclusterBase):
 
         super().__init__(random_state=random_state, **kwargs)
 
-        # NOTE: Hack to allow sklearn API in specifying number of clusters.
-        self.params['number'] = n_clusters
+        # NOTE: Gets assigned to params['number'].
+        self.n_clusters = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -56,6 +56,16 @@ class ChengChurch(RBiclusterBase):
         self.rows_ = None
         self.columns_ = None
         self.biclusters_ = None
+
+    @property
+    def n_clusters(self):
+
+        return self.params['number']
+
+    @n_clusters.setter
+    def n_clusters(self, value):
+
+        self.params['number'] = value
 
     def fit(self, X, y=None, **kwargs):
 
@@ -86,7 +96,7 @@ class Xmotifs(RBiclusterBase):
 
         super().__init__(random_state=random_state, **kwargs)
 
-        # NOTE: Hack to allow sklearn API in specifying number of clusters.
+        # NOTE: Gets assigned to params['number'].
         self.n_clusters = n_clusters
 
         # Update parameters.
@@ -153,6 +163,7 @@ class Plaid(RBiclusterBase):
         super().__init__(random_state=random_state, **kwargs)
 
         # NOTE: n_clusters param is ignored.
+        self.n_clusters = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -265,7 +276,7 @@ class Quest(RBiclusterBase):
         return self
 
 
-class Spectral:
+class Spectral(RBiclusterBase):
     """A wrapper for the R biclust package BCSpectral algorithm.
     """
 
@@ -277,12 +288,15 @@ class Spectral:
         'numberOfEigenvalues': 3,
         'minc': 4,
         'minr': 4,
-        'withinVar': 0.2
+        'withinVar': 0.0
     }
 
     def __init__(self, random_state=0, n_clusters=2, **kwargs):
 
         super().__init__(random_state=random_state, **kwargs)
+
+        # NOTE: n_clusters param is ignored.
+        self.n_clusters = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -314,24 +328,20 @@ if __name__ == '__main__':
     from sklearn.datasets import samples_generator as sg
     from sklearn.metrics import consensus_score
 
-    """
     data, rows, columns = make_biclusters(
-        shape=(300, 30), n_clusters=5, noise=5,
+        shape=(500, 30), n_clusters=10, noise=5,
         shuffle=False, random_state=0
     )
     data, row_idx, col_idx = sg._shuffle(data, random_state=0)
 
-
-    model = Quest()
+    model = Spectral()
     model.fit(data)
 
     score = consensus_score(model.biclusters_,
                         (rows[:, row_idx], columns[:, col_idx]))
-
     print("consensus score: {:.3f}".format(score))
 
     """
-
     import testsets
     import model_selection
 
@@ -367,3 +377,4 @@ if __name__ == '__main__':
     sk_multi_exper.execute_all(
         cluster_exp_data, data_feats.index
     )
+    """
