@@ -188,12 +188,12 @@ class Experiment:
         """Computes the Jaccard coefficient as a measure of similarity between
         two sets of biclusters.
 
-        Compare two bicluster results
-        Percentage of datapoints in the same cluster.
+        The Jaccard index achieves its minimum of zero when the biclusters to
+        not overlap at all and its maximum of one when they are identical.
 
         Args:
-            estimator ():
-            train: Ignored
+            estimator (object): The fitted model holding bicluster esitmates.
+            train: Ignored.
 
         Returns:
             (float): The Jaccard coefficient value.
