@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# cluster.py
+# algorithms.py
 #
 
 """
@@ -36,7 +36,7 @@ class ChengChurch(RBiclusterBase):
         'number': 2
     }
 
-    def __init__(self, random_state=0, n_clusters=1, **kwargs):
+    def __init__(self, random_state=0, n_clusters=2, **kwargs):
 
         super().__init__(random_state=random_state, **kwargs)
 
@@ -82,7 +82,7 @@ class Xmotifs(RBiclusterBase):
         'alpha': 0.05
     }
 
-    def __init__(self, random_state=0, n_clusters=1, **kwargs):
+    def __init__(self, random_state=0, n_clusters=2, **kwargs):
 
         super().__init__(random_state=random_state, **kwargs)
 
@@ -115,7 +115,10 @@ class Xmotifs(RBiclusterBase):
 
     def fit(self, X, y=None, **kwargs):
 
-        self._fit(self.MODEL, X, self.params)
+        # NOTE: Requires discrete input.
+        X_discrete = X.astype(int)
+
+        self._fit(self.MODEL, X_discrete, self.params)
 
         return self
 
@@ -145,7 +148,7 @@ class Plaid(RBiclusterBase):
         'verbose': False,
     }
 
-    def __init__(self, random_state=0, n_clusters=1, **kwargs):
+    def __init__(self, random_state=0, n_clusters=2, **kwargs):
 
         super().__init__(random_state=random_state, **kwargs)
 
@@ -185,14 +188,13 @@ class Bimax(RBiclusterBase):
     params = {
         'minr': 4,
         'minc': 4,
+        'maxc': 10000,
         'number': 2,
     }
 
-    def __init__(self, random_state=0, n_clusters=1, thresh=20, **kwargs):
+    def __init__(self, random_state=0, n_clusters=2, **kwargs):
 
         super().__init__(random_state=random_state, **kwargs)
-
-        self.thresh = thresh
 
         # Update parameters.
         for key in kwargs:
@@ -210,7 +212,9 @@ class Bimax(RBiclusterBase):
 
     def fit(self, X, y=None, **kwargs):
 
-        X_binary = binarize(X, threshold=self.thresh)
+        # NOTE: Requires binary input. Thresh = mean input matrix.
+        _thresh = np.mean(X, axis=None)
+        X_binary = binarize(X, threshold=_thresh)
 
         self._fit(self.MODEL, X_binary, self.params)
 
@@ -236,7 +240,47 @@ class Quest(RBiclusterBase):
         'number': 2,
     }
 
-    def __init__(self, random_state=0, n_clusters=1, **kwargs):
+    def __init__(self, random_state=0, n_clusters=2, **kwargs):
+
+        super().__init__(random_state=random_state, **kwargs)
+
+        # Update parameters.
+        for key in kwargs:
+            if key in self.params.keys():
+                self.params[key] = kwargs[key]
+
+        self.set_params(**kwargs)
+
+        # NOTE:
+        self._output = None
+
+        self.rows_ = None
+        self.columns_ = None
+        self.biclusters_ = None
+
+    def fit(self, X, y=None, **kwargs):
+
+        self._fit(self.MODEL, X, self.params)
+
+        return self
+
+
+class Spectral:
+    """A wrapper for the R biclust package BCSpectral algorithm.
+    """
+
+    MODEL = 'BCSpectral'
+
+    # Hyperparameters
+    params = {
+        'normalization': 'log',
+        'numberOfEigenvalues': 3,
+        'minc': 4,
+        'minr': 4,
+        'withinVar': 0.2
+    }
+
+    def __init__(self, random_state=0, n_clusters=2, **kwargs):
 
         super().__init__(random_state=random_state, **kwargs)
 
@@ -311,9 +355,8 @@ if __name__ == '__main__':
 
     models_and_params = [
     (
-        Quest, {
-            'nd': [10, 20, 30],
-            'ns': [10, 20, 30]
+        Spectral, {
+            'minc': [4, 5],
         }
     )
     ]
