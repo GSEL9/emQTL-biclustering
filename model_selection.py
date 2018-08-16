@@ -20,13 +20,12 @@ import operator
 import numpy as np
 import pandas as pd
 
-from sklearn.model_selection import GridSearchCV
 from sklearn.utils.validation import check_array
+from sklearn.preprocessing import StandardScaler
+from sklearn.grid_search import GridSearchCV
 from sklearn.metrics import consensus_score
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.datasets import samples_generator as sgen
-
-from sklearn.preprocessing import StandardScaler
 
 
 class PerformanceTracker:
