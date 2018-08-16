@@ -107,7 +107,7 @@ def percentile_filter(data, feats):
     sparsity_frac = feats['nonzeros'] / (feats['nrows'] * feats['ncols'])
 
     # NOTE: Added convenience term derived from experience.
-    thresh = np.percentile(data.ravel(), q=100 * (1 - (sparsity_frac + 0.27)))
+    thresh = np.percentile(data.ravel(), q=100 * (1 - (sparsity_frac + 0.1)))
 
     # Replace p-values below threshold with zero.
     data[(data > 0) & (data < thresh)] = 0
@@ -127,14 +127,14 @@ if __name__ == '__main__':
 
     # Characteristics samples from experimental data
     data_feats = pd.read_csv(
-        './../data/data_ids/data_characteristics.csv',
+        './../data/data_id/data_characteristics.csv',
         sep='\t', index_col=0
     )
     # NOTE: Every other dataset is sparse and the oposite sets contains negative values
     sample_data, _, _ = gen_test_sets(
         data_feats, sparse=[False, True, False, True],
         non_neg=[True, True, False, False],
-        shape=(500, 300), n_clusters=2, seed=0
+        shape=(500, 300), n_clusters=3, seed=0
     )
 
     nrows, ncols = 2, 2
