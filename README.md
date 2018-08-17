@@ -4,12 +4,10 @@ Comparing the performance of biclustering algorithms applied to a data matrix co
 ## Todo
 * Rerun benchmarking.
   * Check if opt. hparams of R wrapped models are same as default params (indicates hparams not being updated in wrappers during GS).
-* Add ASR metric to evaluate biclusters. Consider dropping clusters if low ASR value.
-* Add MSR and SMSR metrics to evaluate scaling and shifting patterns of detected biclusters.
 * Verify result model selection procedure by applying discarded models to reference data and compare the results to the outcome of applying the selected models to the reference data.
 * Bicluster method for saving predictions to disk.
 
-# Notes to algorithms
+## Algorithms
 * sklearn SpectralCoclustering:
   * supports only sparse matrices if nonnegative.
 * sklearn SpectralBiclustering:
@@ -22,4 +20,23 @@ Comparing the performance of biclustering algorithms applied to a data matrix co
 * R Spectral:
   * Assumes checkerboard structure.
 
-## Observations
+## Score metrics
+* Recovery:
+* Relevance:
+* Jaccard Index:
+* Average Spearman's Rho:
+* Transposed Virtual Error:
+* Mean Squared Residue:
+* Scaled Mean Squared Residue:
+
+## Evaluation framework
+
+Synthetic data, experiemntal data
+
+### Model selection
+
+Jaccard Index
+
+### Bicluster quality
+
+Recovery, relevance,
