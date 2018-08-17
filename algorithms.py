@@ -199,7 +199,6 @@ class Bimax(RBiclusterBase):
     params = {
         'minr': 4,
         'minc': 4,
-        'maxc': 10000,
         'number': 2,
     }
 
