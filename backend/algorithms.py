@@ -41,7 +41,10 @@ class ChengChurch(RBiclusterBase):
         super().__init__(random_state=random_state, **kwargs)
 
         # NOTE: Gets assigned to params['number'].
-        self.n_clusters = n_clusters
+        if isinstance(n_clusters, (list, tuple)):
+            self.n_clusters = min(n_clusters)
+        else:
+            self.n_clusters = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -89,7 +92,7 @@ class Xmotifs(RBiclusterBase):
         'ns': 200,
         'nd': 100,
         'sd': 5,
-        'alpha': 0.05
+        'alpha': 0.08
     }
 
     def __init__(self, random_state=0, n_clusters=2, **kwargs):
@@ -97,7 +100,10 @@ class Xmotifs(RBiclusterBase):
         super().__init__(random_state=random_state, **kwargs)
 
         # NOTE: Gets assigned to params['number'].
-        self.n_clusters = n_clusters
+        if isinstance(n_clusters, tuple):
+            self.n_clusters = min(n_clusters)
+        else:
+            self.n_clusters = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -206,6 +212,12 @@ class Bimax(RBiclusterBase):
 
         super().__init__(random_state=random_state, **kwargs)
 
+        # NOTE: Gets assigned to params['number'].
+        if isinstance(n_clusters, tuple):
+            self.n_clusters = min(n_clusters)
+        else:
+            self.n_clusters = n_clusters
+
         # Update parameters.
         for key in kwargs:
             if key in self.params.keys():
@@ -219,6 +231,17 @@ class Bimax(RBiclusterBase):
         self.rows_ = None
         self.columns_ = None
         self.biclusters_ = None
+
+    @property
+    def n_clusters(self):
+
+        return self.params['number']
+
+    @n_clusters.setter
+    def n_clusters(self, value):
+
+        self.params['number'] = value
+
 
     def fit(self, X, y=None, **kwargs):
 
@@ -246,13 +269,19 @@ class Quest(RBiclusterBase):
         'nd': 10,
         'ns': 10,
         'sd': 5,
-        'alpha': 0.05,
+        'alpha': 0.08,
         'number': 2,
     }
 
     def __init__(self, random_state=0, n_clusters=2, **kwargs):
 
         super().__init__(random_state=random_state, **kwargs)
+
+        # NOTE: Gets assigned to params['number'].
+        if isinstance(n_clusters, tuple):
+            self.n_clusters = min(n_clusters)
+        else:
+            self.n_clusters = n_clusters
 
         # Update parameters.
         for key in kwargs:
@@ -267,6 +296,16 @@ class Quest(RBiclusterBase):
         self.rows_ = None
         self.columns_ = None
         self.biclusters_ = None
+
+    @property
+    def n_clusters(self):
+
+        return self.params['number']
+
+    @n_clusters.setter
+    def n_clusters(self, value):
+
+        self.params['number'] = value
 
     def fit(self, X, y=None, **kwargs):
 

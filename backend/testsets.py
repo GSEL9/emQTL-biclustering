@@ -19,10 +19,10 @@ __email__ = 'Langberg91@gmail.no'
 import numpy as np
 import pandas as pd
 
-from sklearn.datasets import make_biclusters
+from sklearn.datasets import make_biclusters, make_checkerboard
 
 
-def gen_test_sets(feats, sparse, non_neg, **kwargs):
+def gen_testsets(feats, sparse, non_neg, kind='bicluster', **kwargs):
     """Generate datasets with similar characteristics to reference datasets.
 
     Args:
@@ -38,9 +38,17 @@ def gen_test_sets(feats, sparse, non_neg, **kwargs):
 
     """
 
+    if kind == 'bicluster':
+        generator = make_biclusters
+    elif kind == 'checkerboard':
+        generator = make_checkerboard
+    else:
+        raise ValueError('Invalid generator function: `{}`'.format(kind))
+
     datasets, rows, columns = {}, {}, {}
     for key_num, key in enumerate(feats.index):
-        datasets[key], rows[key], columns[key] = gen_biclusters(
+        datasets[key], rows[key], columns[key] = gen_testdata(
+            generator,
             feats.loc[key, :],
             sparse=sparse[key_num], non_neg=non_neg[key_num],
             **kwargs
@@ -49,7 +57,7 @@ def gen_test_sets(feats, sparse, non_neg, **kwargs):
     return datasets, rows, columns
 
 
-def gen_biclusters(feats, sparse=False, non_neg=False, **kwargs):
+def gen_testdata(generator, feats, sparse=False, non_neg=False, **kwargs):
     """Geenrates synthetic biclsuter data from reference characteristics.
 
     Args:
@@ -67,7 +75,7 @@ def gen_biclusters(feats, sparse=False, non_neg=False, **kwargs):
     """
 
     # Generates dense data.
-    _data, rows, columns = make_biclusters(
+    data, rows, columns = generator(
         shape=kwargs['shape'],
         n_clusters=kwargs['n_clusters'],
         minval=feats['min'],
@@ -80,14 +88,14 @@ def gen_biclusters(feats, sparse=False, non_neg=False, **kwargs):
     # and filtering values from threshold.
     if sparse:
         if non_neg:
-            return percentile_filter(np.absolute(_data), feats), rows, columns
+            return percentile_filter(np.absolute(data), feats), rows, columns
         else:
-            return percentile_filter(_data, feats), rows, columns
+            return percentile_filter(data, feats), rows, columns
     else:
         if non_neg:
-            return np.absolute(_data), rows, columns
+            return np.absolute(data), rows, columns
         else:
-            return _data, rows, columns
+            return data, rows, columns
 
 
 def percentile_filter(data, feats):
@@ -131,11 +139,13 @@ if __name__ == '__main__':
         sep='\t', index_col=0
     )
     # NOTE: Every other dataset is sparse and the oposite sets contains negative values
-    sample_data, _, _ = gen_test_sets(
+    sample_data, _, _ = gen_testsets(
         data_feats, sparse=[False, True, False, True],
         non_neg=[True, True, False, False],
-        shape=(500, 300), n_clusters=3, seed=0
+        shape=(500, 300), n_clusters=3, seed=0,
+        kind='bicluster'
     )
+
 
     nrows, ncols = 2, 2
     labels = list(sample_data.keys())

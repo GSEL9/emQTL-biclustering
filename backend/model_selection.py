@@ -26,6 +26,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.datasets import samples_generator as sgen
 
 from sklearn.preprocessing import StandardScaler
+from sklearn.cluster.bicluster import SpectralBiclustering
 
 
 class PerformanceTracker:
@@ -118,9 +119,10 @@ class Experiment:
 
     """
 
-    def __init__(self, models_and_params, random_state, verbose):
+    def __init__(self, models_and_params, n_clusters, random_state, verbose):
 
         self.models_and_params = models_and_params
+        self.n_clusters = n_clusters
         self.random_state = random_state
         self.verbose = verbose
 
@@ -137,7 +139,7 @@ class Experiment:
         self._rows = None
         self._cols = None
 
-    def execute(self, data, rows, cols, exp_id):
+    def execute(self, data, rows, cols, exp_id, metric=None):
         """Performs model comparison for each class of test data.
 
         Args:
@@ -146,6 +148,7 @@ class Experiment:
             cols (array-like): The original column cluster membership
                 indicators.
             exp_id (int):
+            score_func (str):
 
         """
 
@@ -161,13 +164,18 @@ class Experiment:
                 print('Training set: `{}`'.format(key))
 
             self.results[exp_id][key] = {}
-
-            self._data = data[key]
-            self._rows, self._cols = rows[key], cols[key]
+            self._data, self._rows, self._cols = data[key], rows[key], cols[key]
+            # Set experimental scoring function.
+            if metric == 'jaccard':
+                score_func = self.jaccard
+            elif metric == 'recovery':
+                score_func = self.recovery_relevance
+            else:
+                raise ValueError('Invalid score metric {}'.format(metric))
 
             # Winning model, best hyperparams, best score.
             name, params, score = self.compare_models(
-                n_clusters=self._rows.shape[0]
+                n_clusters=self.n_clusters[exp_id], score_func=score_func
             )
             self.results[exp_id][key] = (name, params, score)
 
@@ -176,7 +184,7 @@ class Experiment:
 
         return self
 
-    def compare_models(self, n_clusters):
+    def compare_models(self, n_clusters, score_func):
         """Compare the model performance with respect to a score metric.
 
         Args:
@@ -200,11 +208,15 @@ class Experiment:
         winning_model, best_params = None, None
         for model, params in self.models_and_params:
 
+            if isinstance(n_clusters, (tuple, list)):
+                if not isinstance(model, SpectralBiclustering):
+                    n_clusters = min(n_clusters)
+
             # Determine the best hyperparameter combo for that model
             _grid = GridSearchCV(
                 model(random_state=self.random_state, n_clusters=n_clusters),
                 param_grid=params,
-                scoring=self.jaccard,
+                scoring=score_func,
                 n_jobs=16,
                 cv=self.dummy_cv,
                 return_train_score=True,
@@ -223,7 +235,6 @@ class Experiment:
 
         return (winner_model, winner_params, best_score)
 
-
     def jaccard(self, estimator, train=None):
         """Computes the Jaccard coefficient as a measure of similarity between
         two sets of biclusters.
@@ -241,20 +252,19 @@ class Experiment:
         """
 
         rows, cols = estimator.biclusters_
-
         if len(rows) == 0 or len(cols) == 0:
             return 0.0
         else:
             ytrue = (self._rows[:, self.row_idx], self._cols[:, self.col_idx])
-            return consensus_score((rows, cols), ytrue)
+            return consensus_score((rows, cols), ytrue, similarity='jaccard')
 
 
 class MultiExperiment(Experiment):
 
     # NOTE: Inferes num clusters from shape of test data.
-    def __init__(self, models_and_params, random_state, verbose=1):
+    def __init__(self, models_and_params, n_clusters, random_state, verbose=1):
 
-        super().__init__(models_and_params, random_state, verbose)
+        super().__init__(models_and_params, n_clusters, random_state, verbose)
 
         self._tracker = None
 
@@ -326,7 +336,7 @@ class MultiExperiment(Experiment):
 
         return [model.__name__ for model, _ in self.models_and_params]
 
-    def execute_all(self, datasets, test_classes):
+    def execute_all(self, datasets, test_classes, metric=None):
 
         self._tracker = PerformanceTracker(test_classes, self.model_labels)
 
@@ -339,7 +349,7 @@ class MultiExperiment(Experiment):
             self.results[exp_id] = {}
 
             # Perform model comparison with test data class.
-            self.execute(dataset, rows, cols, exp_id)
+            self.execute(dataset, rows, cols, exp_id, metric)
 
             # NOTE: Num wins counter is continued for each run.
             self._tracker.update_stats(self.results[exp_id])
@@ -397,8 +407,7 @@ if __name__ == '__main__':
         sk_models_and_params, verbose=0, random_state=SEED
     )
     sk_multi_exper.execute_all(
-        cluster_exp_data, data_feats.index
+        cluster_exp_data, data_feats.index, metric='jaccard'
     )
 
     b = sk_multi_exper.best_setup
-    print(b)

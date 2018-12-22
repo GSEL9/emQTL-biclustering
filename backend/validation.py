@@ -12,7 +12,10 @@ __author__ = 'Severin E. R. Langberg'
 __email__ = 'Langberg91@gmail.no'
 
 
+import os
 import ast
+
+import metrics
 
 import numpy as np
 import pandas as pd
@@ -25,7 +28,7 @@ def recovery_score(true, pred):
 
     frac = np.isin(pred, true).sum() / np.size(true)
 
-    return np.round(frac * 100, decimals=1)
+    return np.round(frac * 100, decimals=3)
 
 
 def relevance_score(true, pred):
@@ -75,6 +78,32 @@ def compare_clusters(pred_cluster, target_cluster):
     df = pd.DataFrame(scores.T, index=idx, columns=cols)
 
     return df
+
+
+def _external_metrics(indicators, nbiclusters, data):
+    # Utility function for computing external metrics.
+
+    row_idx, col_idx = indicators
+
+    scores = {}
+    for num in range(nbiclusters):
+
+        _row_cluster = data.values[row_idx[num], :]
+        cluster = _row_cluster[:, col_idx[num]]
+        if np.any(cluster):
+            scores[num] = {
+                'msr': metrics.mean_squared_residue(cluster),
+                'smsr': metrics.scaled_mean_squared_residue(cluster),
+                'tve': metrics.transposed_virtual_error(cluster),
+                #'shift_scale': metrics.avg_spearmans_rho(cluster)
+            }
+        else:
+            pass
+
+    df_scores = pd.DataFrame(scores).T
+    df_scores.index.name = 'num'
+
+    return df_scores
 
 
 class References:
@@ -135,6 +164,30 @@ class References:
     def genes2(self):
 
         return self.genes['2']
+
+    def external_metrics(self, data):
+
+        cl1 = data.loc[self.cpgs1, self.genes1]
+        cl2 = data.loc[self.cpgs2, self.genes2]
+
+        scores = {}
+        for num, cluster in enumerate([cl1, cl2]):
+            scores[num] = {
+                'msr': metrics.mean_squared_residue(
+                    cluster.values
+                ),
+                'smsr': metrics.scaled_mean_squared_residue(
+                    cluster.values
+                ),
+                'tve': metrics.transposed_virtual_error(
+                    cluster.values
+                ),
+                #'shift_scale': metrics.avg_spearmans_rho(cluster)
+            }
+        df_scores = pd.DataFrame(scores).T
+        df_scores.index = ('ref_cluster1', 'ref_cluster2')
+
+        return df_scores
 
 
 class Biclusters:
@@ -206,12 +259,15 @@ class Biclusters:
             cluster = _row_cluster[:, col_idx[num]]
             if np.any(cluster):
                 cluster_size = np.size(cluster)
+                nrows, ncols = np.shape(cluster)
 
-                stats[num] = {
+                stats[num + 1] = {
                     'max': np.max(cluster),
                     'min': np.min(cluster),
                     'std': np.std(cluster),
-                    'size': cluster_size,
+                    'nrows': nrows,
+                    'ncols': ncols,
+                    #'size': cluster_size,
                     'rel_size': cluster_size / data_size,
                     'zeros': int(np.count_nonzero(cluster==0))
                 }
@@ -239,9 +295,31 @@ class Biclusters:
 
         return row_labels, col_labels
 
-    def to_disk(self):
+    @property
+    def external_metrics(self):
+        """Compute external evaluation metrics for each bicluster."""
 
-        pass
+        return _external_metrics(
+            self.indicators, self.nbiclusters, self.data
+        )
+
+    def to_disk(self, file_name, parent='./../predictions/biclusters/'):
+        """Generate txt files containing row and column indicators for
+        detected biclusters associated with different datasets.
+
+        Args:
+            file_name (str): Name of file.
+
+        """
+
+        row_labels, col_labels = self.labels
+        with open(os.path.join(parent, file_name), 'w') as outfile:
+            for num in range(self.nbiclusters):
+                outfile.write('bicluster_{0}\n'.format(num))
+                outfile.write('{0}\n'.format(row_labels[num]))
+                outfile.write('{0}\n'.format(col_labels[num]))
+
+        return self
 
 
 if __name__ == '__main__':
@@ -249,4 +327,23 @@ if __name__ == '__main__':
     path_target_genes = './../data/test/emQTL_Cluster_genes.txt'
     path_target_cpgs = './../data/test/emQTL_Clusters_CpGs.txt'
 
-    pass
+    import pandas as pd
+    from sklearn.datasets import make_biclusters
+    from sklearn.datasets import samples_generator as sg
+    from sklearn.cluster.bicluster import SpectralCoclustering
+
+    data, rows, columns = make_biclusters(
+        shape=(400, 100), n_clusters=5, noise=5,
+        shuffle=False, random_state=0
+    )
+    shuf_data, row_idx, col_idx = sg._shuffle(data, random_state=0)
+
+    model = SpectralCoclustering(n_clusters=5, random_state=0)
+    model.fit(shuf_data)
+
+    bics = Biclusters(
+        rows=model.rows_, cols=model.columns_, data=pd.DataFrame(data)
+    )
+    scores = bics.external_metrics
+
+    print(scores)
